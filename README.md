@@ -1,4 +1,3 @@
-
 # zzs-data-server
 
 A Node.js server for handling and processing `.tsv.gz` and `.csv.gz` files, built with TypeScript and modern best practices.
@@ -14,6 +13,7 @@ A Node.js server for handling and processing `.tsv.gz` and `.csv.gz` files, buil
 - **API Key Authentication**: Supports API key-based authentication for external access.
 - **Testing**: Integrated testing with Jest and Node.js Test Runner.
 - **Biome**: Ensures consistent code formatting and linting.
+- **Lefthook**: Manages Git hooks for pre-commit checks.
 
 ---
 
@@ -64,12 +64,22 @@ For local development:
 2. Format and lint the code using Biome:
    - Check for issues:
      ```bash
-     pnpm lint
+     pnpm lint:check
      ```
    - Fix issues:
      ```bash
      pnpm lint:fix
      ```
+
+3. Set up Lefthook for Git hooks:
+   ```bash
+   pnpm lefthook install
+   ```
+
+4. Run pre-commit hooks manually:
+   ```bash
+   pnpm lefthook run pre-commit
+   ```
 
 ---
 
