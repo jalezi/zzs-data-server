@@ -1,4 +1,4 @@
-import { dataFiles } from '../config'
+import { dataFiles } from '../database/config'
 import { parseCompressedFile } from '../utils/fileHelper'
 
 export const getFileData = async (fileId: string) => {

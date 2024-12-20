@@ -1,5 +1,5 @@
 import { type Request, type Response, Router } from 'express'
-import { dataFiles } from '../../config'
+import { dataFiles } from '../../database/config'
 import { parseCompressedFile } from '../../utils/fileHelper'
 
 const router = Router()

@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express'
-import { env } from '../config'
+import { env } from '../env'
 import { logger } from '../utils/logger'
 
 const API_KEYS = env.API_KEYS

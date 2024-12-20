@@ -40,7 +40,16 @@
           "level": "error"
         }
       },
-      "recommended": true
+      "nursery": {
+        "noExportedImports": "error"
+      },
+      "recommended": true,
+      "style": {
+        "useImportType": {
+          "fix": "none",
+          "level": "error"
+        }
+      }
     }
   },
   "organizeImports": {

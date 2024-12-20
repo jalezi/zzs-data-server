@@ -1,7 +1,7 @@
 import cors from 'cors'
 import express from 'express'
 import helmet from 'helmet'
-import { env } from './config'
+import { env } from './env'
 import { apiKeyAuth } from './middleware/apiKeyAuth'
 import { errorHandler } from './middleware/errorHandler'
 import { globalRateLimiter } from './middleware/rateLimiter'
@@ -32,6 +32,8 @@ app.use('/api', apiVersioningRouter)
 app.use(catchAllRoute)
 app.use(errorHandler)
 
-app.listen(PORT, () => {
-  logger.info(`Server running on http://localhost:${PORT}`)
-})
+if (require.main === module) {
+  app.listen(PORT, () => {
+    logger.info(`Server running on http://localhost:${PORT}`)
+  })
+}
