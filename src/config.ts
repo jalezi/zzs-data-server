@@ -14,7 +14,7 @@ export const dataFiles = [
 
 const envSchema = z.object({
   PORT: z.string().default('3000'),
-  API_KEYS: z.string(),
+  API_KEYS: z.string().default('example-key-1,example-key-2'),
   API_KEYS_REQUIRED: z
     .enum(['true', 'false'])
     .default('false')
