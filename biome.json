@@ -31,6 +31,10 @@
           "fix": "none",
           "level": "error"
         },
+        "noUnusedImports": {
+          "fix": "none",
+          "level": "error"
+        },
         "noUnusedVariables": {
           "fix": "none",
           "level": "error"
