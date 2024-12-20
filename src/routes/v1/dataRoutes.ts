@@ -4,10 +4,6 @@ import { parseCompressedFile } from '../../utils/fileHelper'
 
 const router = Router()
 
-router.get('/', (_req, res) => {
-  res.json({ message: 'Welcome to API version 1 - Data' })
-})
-
 router.get('/:fileId', async (req: Request, res: Response) => {
   const { fileId } = req.params
   const fileConfig = dataFiles.find((file) => file.id === fileId)
