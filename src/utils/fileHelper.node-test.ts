@@ -274,4 +274,51 @@ describe('fileHelper tests', () => {
       ),
     );
   });
+
+  it('should handle premature stream closure gracefully', async () => {
+    const mockStream = new PassThrough();
+    const gunzipStream = new PassThrough();
+    const parseStream = new PassThrough({ objectMode: true });
+
+    // Mock fs.createReadStream to return the mock stream
+    fsMock.returns(mockStream);
+
+    // Mock zlib.createGunzip to return the gunzip stream
+    zlibMock.returns(gunzipStream);
+
+    // Mock parse to handle premature stream closure
+    parseMock.callsFake(() => parseStream);
+
+    // Simulate premature closure
+
+    setImmediate(() => {
+      mockStream.pipe(gunzipStream);
+      gunzipStream.write('id\tname\n1\tTest\n'); // Partial data
+      gunzipStream.emit('close'); // Trigger close event
+    });
+
+    // Call the function and ensure it handles the case gracefully
+    await assert.rejects(
+      () => parseCompressedFile('./premature-closure-file.tsv.gz', 'tsv'),
+      new Error('Premature stream closure or unexpected end'),
+    );
+
+    // Verify the logger captured the error
+    assert(
+      loggerErrorSpy.calledWithMatch(
+        sinon.match.has(
+          'err',
+          sinon.match
+            .instanceOf(Error)
+            .and(
+              sinon.match.has(
+                'message',
+                'Premature stream closure or unexpected end',
+              ),
+            ),
+        ),
+        'File parsing failed',
+      ),
+    );
+  });
 });
