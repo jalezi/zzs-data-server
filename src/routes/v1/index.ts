@@ -1,8 +1,8 @@
-import { Router } from 'express'
-import dataRoutes from './dataRoutes'
+import { Router } from 'express';
+import dataRoutes from './dataRoutes';
 
-const router = Router()
+const router = Router();
 
-router.use('/data', dataRoutes)
+router.use('/data', dataRoutes);
 
-export default router
+export default router;

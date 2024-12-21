@@ -1,5 +1,5 @@
-import rateLimit from 'express-rate-limit'
-import { logger } from '../utils/logger'
+import rateLimit from 'express-rate-limit';
+import { logger } from '../utils/logger';
 
 // Global rate limit settings
 const globalRateLimiter = rateLimit({
@@ -10,11 +10,11 @@ const globalRateLimiter = rateLimit({
     message: 'Too many requests, please try again later.',
   },
   handler: (req, res, _next, options) => {
-    logger.warn(`Rate limit exceeded for IP: ${req.ip}`)
-    res.status(options.statusCode).json(options.message)
+    logger.warn(`Rate limit exceeded for IP: ${req.ip}`);
+    res.status(options.statusCode).json(options.message);
   },
   standardHeaders: true, // Return rate limit info in headers
   legacyHeaders: false, // Disable deprecated headers
-})
+});
 
-export { globalRateLimiter }
+export { globalRateLimiter };

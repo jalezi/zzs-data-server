@@ -1,5 +1,5 @@
-import { z } from 'zod'
-import { logger } from '../utils/logger'
+import { z } from 'zod';
+import { logger } from '../utils/logger';
 
 const envSchema = z.object({
   PORT: z.string().default('3000'),
@@ -13,25 +13,25 @@ const envSchema = z.object({
     .default('development'),
   RATE_LIMIT_WINDOW_MS: z.string().default('60_000'),
   RATE_LIMIT_MAX: z.string().default('100'),
-})
+});
 
-export type Env = z.infer<typeof envSchema>
+export type Env = z.infer<typeof envSchema>;
 
-logger.info('Validating environment variables')
+logger.info('Validating environment variables');
 try {
-  envSchema.parse(process.env)
-  logger.info('Environment variables are valid')
+  envSchema.parse(process.env);
+  logger.info('Environment variables are valid');
 } catch (error) {
   if (error instanceof z.ZodError) {
     const formattedErrors = error.errors.map((err) => ({
       path: err.path.join('.'),
       message: err.message,
-    }))
-    logger.error({ issues: formattedErrors }, 'Invalid environment variables')
+    }));
+    logger.error({ issues: formattedErrors }, 'Invalid environment variables');
   } else {
-    logger.error({ error }, 'Unexpected error during environment validation')
+    logger.error({ error }, 'Unexpected error during environment validation');
   }
-  process.exit(1)
+  process.exit(1);
 }
 
-export const env = envSchema.parse(process.env)
+export const env = envSchema.parse(process.env);

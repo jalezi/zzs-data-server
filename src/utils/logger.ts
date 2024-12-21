@@ -1,5 +1,5 @@
-import pino from 'pino'
-import pinoHttp from 'pino-http'
+import pino from 'pino';
+import pinoHttp from 'pino-http';
 
 const logger = pino({
   transport: {
@@ -9,15 +9,15 @@ const logger = pino({
     },
   },
   level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
-})
+});
 
 // HTTP logging middleware using Pino
 const httpLogger = pinoHttp({
   logger, // Use the same logger instance
   customLogLevel: (_req, res, _err) => {
-    if (res.statusCode >= 500) return 'error'
-    if (res.statusCode >= 400) return 'warn'
-    return 'info'
+    if (res.statusCode >= 500) return 'error';
+    if (res.statusCode >= 400) return 'warn';
+    return 'info';
   },
   serializers: {
     req: (req) => ({
@@ -33,6 +33,6 @@ const httpLogger = pinoHttp({
     `${req.method} ${req.url} - ${res.statusCode}`,
   customErrorMessage: (req, _res, err) =>
     `Error on ${req.method} ${req.url}: ${err.message}`,
-})
+});
 
-export { logger, httpLogger }
+export { logger, httpLogger };
