@@ -234,7 +234,44 @@ describe('fileHelper tests', () => {
     );
   });
 
-  it.skip('should handle an empty compressed file gracefully', async () => {
-    // Placeholder for empty file test
+  it('should handle an empty compressed file gracefully', async () => {
+    const mockStream = new PassThrough();
+    const gunzipStream = new PassThrough();
+    const parseStream = new PassThrough({ objectMode: true });
+
+    // Mock fs.createReadStream to return the mock stream
+    fsMock.returns(mockStream);
+
+    // Mock zlib.createGunzip to return the gunzip stream
+    zlibMock.returns(gunzipStream);
+
+    // Mock parse to handle an empty stream
+    parseMock.callsFake(() => parseStream);
+
+    // Simulate an empty file content
+    setImmediate(() => {
+      mockStream.pipe(gunzipStream);
+      gunzipStream.end(); // End the stream without writing any data
+    });
+
+    // Call the function
+    const rows = await parseCompressedFile('./empty-file.tsv.gz', 'tsv');
+
+    // Verify the returned result
+    assert.deepStrictEqual(rows, []);
+
+    // Verify the logger captured the correct log messages
+    assert(
+      loggerInfoSpy.calledWithMatch(
+        { filePath: './empty-file.tsv.gz', format: 'tsv' },
+        'Starting file parsing',
+      ),
+    );
+    assert(
+      loggerInfoSpy.calledWithMatch(
+        { filePath: './empty-file.tsv.gz', rowsCount: 0 },
+        'File parsing completed',
+      ),
+    );
   });
 });
