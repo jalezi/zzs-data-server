@@ -25,7 +25,7 @@ const mockedFileHelper = {
 
 // Replace dependencies with mocks
 const dataRoutes = proxyquire('./dataRoutes', {
-  '../../config': mockedConfig,
+  '../../database/config': mockedConfig,
   '../../utils/fileHelper': mockedFileHelper,
 }).default;
 
