@@ -7,11 +7,12 @@ import { logger } from './logger';
  * Parses a compressed `.gz` file containing tab-separated (TSV) or
  * comma-separated (CSV) data into an array of objects.
  *
+ * @template T - The type of the parsed row objects.
  * @param {string} filePath - The path to the compressed `.gz` file.
  * @param {'tsv' | 'csv'} format - Specifies the file's format:
  *   - `'tsv'` for tab-separated values.
  *   - `'csv'` for comma-separated values.
- * @returns {Promise<any[]>} A promise that resolves to an array of objects,
+ * @returns {Promise<T[]>} A promise that resolves to an array of objects,
  * where each object represents a parsed row of the file.
  *
  * @example
