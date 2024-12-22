@@ -1,7 +1,18 @@
 import fs from 'node:fs';
 import zlib from 'node:zlib';
 import { parse } from 'csv-parse';
+import { catchError } from './catchError';
 import { logger } from './logger';
+
+export const loggerMessages = {
+  start: 'Starting file parsing',
+  readError: 'File reading failed',
+  decompressionError: 'Decompression failed',
+  parseError: 'File parsing failed',
+  streamClosed: 'Stream closed',
+  success: 'File parsing completed',
+  prematureEnd: 'Premature stream closure or unexpected end',
+};
 
 /**
  * Parses a compressed `.gz` file containing tab-separated (TSV) or
@@ -53,21 +64,21 @@ import { logger } from './logger';
 export const parseCompressedFile = async <T = Record<string, unknown>>(
   filePath: string,
   format: 'tsv' | 'csv',
-): Promise<T[]> => {
+): Promise<ReturnType<typeof catchError>> => {
   const delimiter = format === 'tsv' ? '\t' : ',';
-  logger.info({ filePath, format }, 'Starting file parsing');
+  logger.info({ filePath, format }, loggerMessages.start);
 
-  return new Promise((resolve, reject) => {
+  const promise = new Promise<T[]>((resolve, reject) => {
     const rows: T[] = [];
     let streamEnded = false;
 
     const input = fs.createReadStream(filePath).on('error', (err) => {
-      logger.error({ err, filePath }, 'File reading failed');
+      logger.error({ err, filePath }, loggerMessages.readError);
       reject(err);
     });
 
     const gunzip = zlib.createGunzip().on('error', (err) => {
-      logger.error({ err, filePath }, 'Decompression failed');
+      logger.error({ err, filePath }, loggerMessages.decompressionError);
       reject(err);
     });
 
@@ -77,25 +88,29 @@ export const parseCompressedFile = async <T = Record<string, unknown>>(
         streamEnded = true;
         logger.info(
           { filePath, rowsCount: rows.length },
-          'File parsing completed',
+          loggerMessages.success,
         );
         resolve(rows);
       })
       .on('error', (err) => {
-        logger.error({ err, filePath }, 'File parsing failed');
+        logger.error({ err, filePath }, loggerMessages.parseError);
         reject(err);
       });
 
     input
       .pipe(gunzip)
       .on('close', () => {
-        logger.debug({ filePath, streamEnded }, 'Stream closed');
+        logger.debug({ filePath, streamEnded }, loggerMessages.streamClosed);
         if (!streamEnded) {
-          const error = new Error('Premature stream closure or unexpected end');
-          logger.error({ err: error, filePath }, 'File parsing failed');
+          const error = new Error(loggerMessages.prematureEnd);
+          logger.error({ err: error, filePath }, loggerMessages.parseError);
           reject(error);
         }
       })
       .pipe(parser);
   });
+
+  return await catchError<T[], new (message?: string) => Error>(promise, [
+    Error,
+  ]);
 };
