@@ -49,17 +49,15 @@ import { logger } from './logger';
  * - Third-Party Libraries:
  *   - `csv-parse`: For parsing CSV/TSV content.
  */
-export const parseCompressedFile = async (
+export const parseCompressedFile = async <T = Record<string, unknown>>(
   filePath: string,
   format: 'tsv' | 'csv',
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-): Promise<any[]> => {
+): Promise<T[]> => {
   const delimiter = format === 'tsv' ? '\t' : ',';
   logger.info({ filePath, format }, 'Starting file parsing');
 
   return new Promise((resolve, reject) => {
-    // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-    const rows: any[] = [];
+    const rows: T[] = [];
     let streamEnded = false;
 
     const input = fs.createReadStream(filePath).on('error', (err) => {
