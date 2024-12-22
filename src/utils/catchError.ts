@@ -1,3 +1,16 @@
+/**
+ * Catches errors from a promise and logs them using the provided logger.
+ *
+ * @template T - The type of the resolved value of the promise.
+ * @template E - The type of the errors to catch, extending the Error constructor.
+ *
+ * @param {Promise<T>} promise - The promise to handle errors for.
+ * @param {E[] | undefined} [errorsToCatch] - An optional array of specific error types to catch.
+ *
+ * @returns {ReturnCatchErrorType<T>} A promise that resolves to a tuple. The first element is either `undefined` if no error occurred, or an error object if an error was caught. The second element is the resolved value of the promise if no error occurred.
+ *
+ * @throws Will rethrow the error if it is not in the `errorsToCatch` array.
+ */
 import type { Level } from 'pino';
 import { logger } from './logger';
 
@@ -22,34 +35,21 @@ const logError = (
   });
 };
 
-/**
- * Handles a promise and catches specific error types, logging the process.
- *
- * This utility ensures that errors are either caught and handled or rethrown.
- * It logs successful resolutions, caught errors, and unexpected errors.
- *
- * @template T - The type of the resolved value from the promise.
- * @template E - The types of errors to catch (must extend `Error`).
- * @param {Promise<T>} promise - The promise to handle.
- * @param {E[]} errorsToCatch - An array of error classes to catch and handle.
- * @returns {Promise<[undefined, T] | [E | unknown]>}
- *   A tuple where the first element is `undefined` for successful resolutions or the caught error,
- *   and the second element is the resolved value or `undefined` in case of an error.
- */
+export type ReturnCatchErrorType<T> = Promise<
+  [unknown] | [Error] | [undefined, T]
+>;
+
 export const catchError = async <T, E extends new (message?: string) => Error>(
   promise: Promise<T>,
-  errorsToCatch: E[],
-): Promise<[undefined, T] | [E] | [unknown]> => {
+  errorsToCatch?: E[] | undefined,
+): ReturnCatchErrorType<T> => {
   try {
     const data = await promise;
     logger.info(loggerMessages.success, { data });
     return [undefined, data] as [undefined, T];
   } catch (error) {
-    if (
-      errorsToCatch === undefined ||
-      errorsToCatch.length === 0 ||
-      !(error instanceof Error)
-    ) {
+    if (!errorsToCatch) {
+      console.log('error', loggerMessages.unknown, error);
       logError('error', loggerMessages.unknown, error);
       return [error];
     }
@@ -58,7 +58,7 @@ export const catchError = async <T, E extends new (message?: string) => Error>(
       logError('warn', loggerMessages.specific, error);
       return [error];
     }
-
+    console.log('error', loggerMessages.unhandled, error);
     logError('error', loggerMessages.unhandled, error);
     throw error;
   }

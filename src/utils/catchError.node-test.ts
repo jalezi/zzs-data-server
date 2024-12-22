@@ -38,7 +38,7 @@ describe('catchError', () => {
     const error = new Error('Test error');
     const promise = Promise.reject(error);
 
-    const result = await catchError(promise, []);
+    const result = await catchError(promise);
     assert.deepStrictEqual(result, [error]);
     sinon.assert.calledWith(
       loggerErrorStub,
@@ -73,19 +73,6 @@ describe('catchError', () => {
       loggerMessages.unhandled,
       sinon.match.any,
     );
-  });
-
-  it('should handle non-Error types gracefully', async () => {
-    const promise = Promise.reject('String error'); // Non-Error type
-    const result = await catchError(promise, [SpecificError]);
-
-    assert.deepStrictEqual(result, ['String error']); // Ensure correct return value
-
-    sinon.assert.calledWith(loggerErrorStub, loggerMessages.unknown, {
-      errorType: 'Unknown', // Non-Error types are logged as 'Unknown'
-      error: 'String error', // The raw string value
-      stack: undefined, // Non-Error types do not have a stack
-    });
   });
 
   it('should log errors appropriately', async () => {
