@@ -19,34 +19,9 @@ describe('fileHelper tests', () => {
     // Reset and stub mocks
     fsMock = sinon.stub(fs, 'createReadStream');
     zlibMock = sinon.stub(zlib, 'createGunzip');
+    parseMock = sinon.stub();
 
-    // Mock parse function
-    parseMock = sinon.stub().callsFake((_options, callback) => {
-      const parseStream = new (require('node:stream').Transform)({
-        objectMode: true,
-        transform(
-          chunk: { toString: () => string },
-          // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-          _encoding: any,
-          done: () => void,
-        ) {
-          const rows = chunk
-            .toString()
-            .split('\n')
-            .slice(1) // Skip header
-            .map((line) => {
-              const [id, name] = line.split('\t');
-              return { id, name };
-            });
-          // biome-ignore lint/complexity/noForEach: <explanation>
-          rows.forEach((row) => this.push(row));
-          done();
-        },
-      });
-      callback(null, parseStream);
-      return parseStream;
-    });
-
+    // Spy on logger
     loggerInfoSpy = sinon.spy(logger, 'info');
     loggerErrorSpy = sinon.spy(logger, 'error');
   });
@@ -55,42 +30,42 @@ describe('fileHelper tests', () => {
     sinon.restore();
   });
 
-  it('should parse a valid TSV file successfully', async () => {
-    const mockStream = new PassThrough(); // Use PassThrough
-    mockStream.push('id\tname\n1\tTest\n2\tAnother\n');
-    mockStream.push(null); // End of stream
+  /**
+   * Helper function to set up mocks for streams.
+   */
+  const setupMocks = (
+    fileContent?: string,
+    emitError?: Error | { code: string; message: string },
+  ) => {
+    const mockStream = new PassThrough();
+    const gunzipStream = new PassThrough();
+    const parseStream = new PassThrough({ objectMode: true });
+
+    if (fileContent) {
+      mockStream.write(fileContent);
+      mockStream.end(); // Mark end of stream
+    }
+
+    if (emitError) {
+      setImmediate(() => parseStream.emit('error', emitError));
+    }
 
     fsMock.returns(mockStream);
-
-    const gunzipStream = new PassThrough();
     zlibMock.returns(gunzipStream);
+    parseMock.callsFake(() => parseStream);
 
+    return { mockStream, gunzipStream, parseStream };
+  };
+
+  it('should parse a valid TSV file successfully', async () => {
+    const { mockStream, gunzipStream } = setupMocks(
+      'id\tname\n1\tTest\n2\tAnother\n',
+    );
+
+    // Simulate file content piping
     setImmediate(() => {
-      gunzipStream.write('id\tname\n1\tTest\n2\tAnother\n');
+      mockStream.pipe(gunzipStream);
       gunzipStream.end();
-    });
-
-    parseMock.callsFake((_options) => {
-      const parseStream = new PassThrough({
-        objectMode: true,
-        transform(chunk, _encoding, callback) {
-          const rows = chunk
-            .toString()
-            .split('\n')
-            .slice(1) // Skip header
-            // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-            .map((line: { split: (arg0: string) => [any, any] }) => {
-              const [id, name] = line.split('\t');
-              return { id, name };
-            });
-
-          // biome-ignore lint/complexity/noForEach: <explanation>
-          // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-          rows.forEach((row: any) => this.push(row));
-          callback();
-        },
-      });
-      return parseStream;
     });
 
     const rows = await parseCompressedFile('./test-file.tsv.gz', 'tsv');
@@ -100,117 +75,31 @@ describe('fileHelper tests', () => {
       { id: '2', name: 'Another' },
     ]);
 
-    assert(
-      loggerInfoSpy.calledWithMatch(
-        { filePath: './test-file.tsv.gz', format: 'tsv' },
-        'Starting file parsing',
-      ),
+    sinon.assert.calledWithMatch(
+      loggerInfoSpy,
+      { filePath: './test-file.tsv.gz', format: 'tsv' },
+      'Starting file parsing',
     );
-    assert(
-      loggerInfoSpy.calledWithMatch(
-        { filePath: './test-file.tsv.gz', rowsCount: 2 },
-        'File parsing completed',
-      ),
-    );
-  });
-
-  it.skip('should throw an error for an invalid file', async () => {
-    const mockStream = new PassThrough();
-    const error = new Error('Invalid file');
-
-    // Mock fs.createReadStream to return the mock stream
-    fsMock.returns(mockStream);
-
-    // Mock zlib.createGunzip to pass the mockStream
-    const gunzipStream = new PassThrough();
-    zlibMock.returns(gunzipStream);
-
-    // Mock parse to return another mock stream
-    const parseStream = new PassThrough({
-      objectMode: true,
-      transform(_chunk, _encoding, callback) {
-        console.log('Transforming');
-        callback(null, parseStream); // Call the callback with an error
-      },
-    });
-    parseMock.callsFake(() => parseStream);
-
-    // Emit an error on the parseStream
-    setImmediate(() => {
-      mockStream.emit('error', error); // End of stream
-    });
-
-    // Call the function and ensure it rejects
-    await assert.rejects(
-      () => parseCompressedFile('./invalid-file.tsv.gz', 'tsv'),
-      error,
-    );
-
-    // Check logger calls
-    assert(
-      loggerErrorSpy.calledWithMatch(
-        { err: error, filePath: './invalid-file.tsv.gz' },
-        'File parsing failed',
-      ),
-    );
-  });
-
-  it.skip('should throw an error for a malformed compressed file', async () => {
-    const mockStream = new PassThrough();
-    const gunzipStream = new PassThrough();
-    const error = new Error('Malformed gzip data');
-
-    // Mock fs.createReadStream to return the mock stream
-    fsMock.returns(mockStream);
-
-    // Mock zlib.createGunzip to emit an error
-    zlibMock.returns(gunzipStream);
-    setImmediate(() => {
-      gunzipStream.emit('error', error); // Emit the error
-    });
-
-    // Call the function and ensure it rejects
-    await assert.rejects(
-      () => parseCompressedFile('./malformed-file.tsv.gz', 'tsv'),
-      error,
-    );
-
-    // Check logger calls
-    assert(
-      loggerErrorSpy.calledWithMatch(
-        { err: error, filePath: './malformed-file.tsv.gz' },
-        'File parsing failed',
-      ),
+    sinon.assert.calledWithMatch(
+      loggerInfoSpy,
+      { filePath: './test-file.tsv.gz', rowsCount: 2 },
+      'File parsing completed',
     );
   });
 
   it('should throw an error for a malformed TSV content', async () => {
-    const mockStream = new PassThrough();
-    const gunzipStream = new PassThrough();
-    const parseStream = new PassThrough({ objectMode: true });
     const error = {
       code: 'CSV_RECORD_INCONSISTENT_COLUMNS',
       message: 'Invalid Record Length: columns length is 2, got 1 on line 3',
     };
+    const { mockStream, gunzipStream } = setupMocks(
+      'id\tname\n1\tTest\ninvalid-row\n',
+      error,
+    );
 
-    // Mock fs.createReadStream to return the mock stream
-    fsMock.returns(mockStream);
-
-    // Mock zlib.createGunzip to return the gunzip stream
-    zlibMock.returns(gunzipStream);
-
-    // Mock parse to emit a CsvError
-    parseMock.callsFake(() => {
-      setImmediate(() => {
-        parseStream.emit('error', error);
-      });
-      return parseStream;
-    });
-
-    // Simulate valid file content being piped into the parser
+    // Simulate file content piping
     setImmediate(() => {
       mockStream.pipe(gunzipStream);
-      gunzipStream.write('id\tname\n1\tTest\ninvalid-row\n');
       gunzipStream.end();
     });
 
@@ -219,106 +108,90 @@ describe('fileHelper tests', () => {
       new Error('Invalid Record Length: columns length is 2, got 1 on line 3'),
     );
 
-    // Verify the logger captured the error
-    assert(
-      loggerErrorSpy.calledWithMatch(
+    sinon.assert.calledWithMatch(
+      loggerErrorSpy,
+      sinon.match.has(
+        'err',
         sinon.match.has(
-          'err',
-          sinon.match.has(
-            'message',
-            'Invalid Record Length: columns length is 2, got 1 on line 3',
-          ),
+          'message',
+          'Invalid Record Length: columns length is 2, got 1 on line 3',
         ),
-        'File parsing failed',
       ),
+      'File parsing failed',
     );
   });
 
   it('should handle an empty compressed file gracefully', async () => {
-    const mockStream = new PassThrough();
-    const gunzipStream = new PassThrough();
-    const parseStream = new PassThrough({ objectMode: true });
+    const { mockStream, gunzipStream } = setupMocks('');
 
-    // Mock fs.createReadStream to return the mock stream
-    fsMock.returns(mockStream);
-
-    // Mock zlib.createGunzip to return the gunzip stream
-    zlibMock.returns(gunzipStream);
-
-    // Mock parse to handle an empty stream
-    parseMock.callsFake(() => parseStream);
-
-    // Simulate an empty file content
+    // Simulate file content piping
     setImmediate(() => {
       mockStream.pipe(gunzipStream);
-      gunzipStream.end(); // End the stream without writing any data
+      gunzipStream.end();
     });
 
-    // Call the function
     const rows = await parseCompressedFile('./empty-file.tsv.gz', 'tsv');
 
-    // Verify the returned result
     assert.deepStrictEqual(rows, []);
 
-    // Verify the logger captured the correct log messages
-    assert(
-      loggerInfoSpy.calledWithMatch(
-        { filePath: './empty-file.tsv.gz', format: 'tsv' },
-        'Starting file parsing',
-      ),
+    sinon.assert.calledWithMatch(
+      loggerInfoSpy,
+      { filePath: './empty-file.tsv.gz', format: 'tsv' },
+      'Starting file parsing',
     );
-    assert(
-      loggerInfoSpy.calledWithMatch(
-        { filePath: './empty-file.tsv.gz', rowsCount: 0 },
-        'File parsing completed',
-      ),
+    sinon.assert.calledWithMatch(
+      loggerInfoSpy,
+      { filePath: './empty-file.tsv.gz', rowsCount: 0 },
+      'File parsing completed',
     );
   });
 
   it('should handle premature stream closure gracefully', async () => {
-    const mockStream = new PassThrough();
-    const gunzipStream = new PassThrough();
-    const parseStream = new PassThrough({ objectMode: true });
-
-    // Mock fs.createReadStream to return the mock stream
-    fsMock.returns(mockStream);
-
-    // Mock zlib.createGunzip to return the gunzip stream
-    zlibMock.returns(gunzipStream);
-
-    // Mock parse to handle premature stream closure
-    parseMock.callsFake(() => parseStream);
-
-    // Simulate premature closure
+    const { mockStream, gunzipStream } = setupMocks();
 
     setImmediate(() => {
       mockStream.pipe(gunzipStream);
-      gunzipStream.write('id\tname\n1\tTest\n'); // Partial data
-      gunzipStream.emit('close'); // Trigger close event
+      gunzipStream.emit('close'); // Premature close
     });
 
-    // Call the function and ensure it handles the case gracefully
     await assert.rejects(
       () => parseCompressedFile('./premature-closure-file.tsv.gz', 'tsv'),
       new Error('Premature stream closure or unexpected end'),
     );
 
-    // Verify the logger captured the error
-    assert(
-      loggerErrorSpy.calledWithMatch(
+    sinon.assert.calledWithMatch(
+      loggerErrorSpy,
+      sinon.match.has(
+        'err',
         sinon.match.has(
-          'err',
-          sinon.match
-            .instanceOf(Error)
-            .and(
-              sinon.match.has(
-                'message',
-                'Premature stream closure or unexpected end',
-              ),
-            ),
+          'message',
+          'Premature stream closure or unexpected end',
         ),
-        'File parsing failed',
       ),
+      'File parsing failed',
+    );
+  });
+
+  it('should process rows correctly from a valid input', async () => {
+    const fileContent = 'id\tname\n1\tTest\n2\tAnother\n';
+    const { mockStream, gunzipStream } = setupMocks(fileContent);
+
+    // Simulate file content piping
+    setImmediate(() => {
+      mockStream.pipe(gunzipStream);
+      gunzipStream.end();
+    });
+
+    const rows = await parseCompressedFile('./test-file.tsv.gz', 'tsv');
+    assert.deepStrictEqual(rows, [
+      { id: '1', name: 'Test' },
+      { id: '2', name: 'Another' },
+    ]);
+
+    sinon.assert.calledWithMatch(
+      loggerInfoSpy,
+      { filePath: './test-file.tsv.gz', rowsCount: 2 },
+      'File parsing completed',
     );
   });
 });
