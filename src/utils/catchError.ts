@@ -19,7 +19,7 @@ export const loggerMessages = {
   unknown: 'Error occurred (no specific error types to catch)',
   specific: 'Caught a specific error',
   unhandled: 'Unhandled error occurred',
-};
+} as const;
 
 const logError = (
   level: Level,
@@ -49,7 +49,6 @@ export const catchError = async <T, E extends new (message?: string) => Error>(
     return [undefined, data] as [undefined, T];
   } catch (error) {
     if (!errorsToCatch) {
-      console.log('error', loggerMessages.unknown, error);
       logError('error', loggerMessages.unknown, error);
       return [error];
     }
@@ -58,7 +57,6 @@ export const catchError = async <T, E extends new (message?: string) => Error>(
       logError('warn', loggerMessages.specific, error);
       return [error];
     }
-    console.log('error', loggerMessages.unhandled, error);
     logError('error', loggerMessages.unhandled, error);
     throw error;
   }
