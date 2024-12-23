@@ -10,7 +10,7 @@ type DataFile = {
 const usersSchema = z.object({
   id: z.string().nonempty(),
   name: z.string().nonempty(),
-  age: z.preprocess((val) => (val === '' ? undefined : val), z.coerce.number()),
+  email: z.string().email(),
 });
 
 const productsSchema = z.object({
