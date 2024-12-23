@@ -12,16 +12,6 @@ const DELIMITERS = {
 
 type Format = keyof typeof DELIMITERS;
 
-export const loggerMessages = {
-  start: 'Starting file parsing',
-  readError: 'File reading failed',
-  decompressionError: 'Decompression failed',
-  parseError: 'File parsing failed',
-  streamClosed: 'Stream closed',
-  success: 'File parsing completed',
-  prematureEnd: 'Premature stream closure or unexpected end',
-} as const;
-
 /**
  * Utility for creating parsers with error handling.
  */
@@ -54,7 +44,7 @@ const handlePromise = async <T>(
   } catch (err) {
     logger.error({ ...loggerContext, err }, 'An error occurred');
     if (err instanceof Error) return [err];
-    return [new Error('An unknown error occurred', { cause: err })];
+    return [new Error('Unknown', { cause: err })];
   }
 };
 
@@ -84,7 +74,7 @@ export const parseCompressedFile = async <T>(
 
     const onStreamClose = () => {
       if (!streamEnded) {
-        const error = new Error(loggerMessages.prematureEnd);
+        const error = new Error('Premature stream closure or unexpected end');
         reject(error);
       }
     };
