@@ -1,15 +1,11 @@
 import fs from 'node:fs';
+import { Readable } from 'node:stream';
 import zlib from 'node:zlib';
 import type { ZodSchema } from 'zod';
 import { DELIMITERS } from '../constants/rawFiles';
 import type { ReturnCatchErrorType } from './catchError';
 import { createParser, handlePromise, streamHandler } from './helpers';
 
-type Format = keyof typeof DELIMITERS;
-
-/**
- * Result type for parsed CSV/TSV files.
- */
 export interface ParseResult<T> {
   data: T[];
   meta: {
@@ -21,28 +17,28 @@ export interface ParseResult<T> {
 }
 
 /**
- * Parses a compressed file (gzip) and extracts its contents as an array of objects.
+ * Processes a file stream with Zod validation.
  */
-export const parseCompressedFile = async <T>(
-  filePath: string,
-  format: Format,
+const processStream = <T>(
+  stream: NodeJS.ReadableStream,
+  delimiter: string,
   zodSchema: ZodSchema<T>,
-): ReturnCatchErrorType<ParseResult<T>> => {
-  const promise = new Promise<ParseResult<T>>((resolve, reject) => {
+): Promise<ParseResult<T>> => {
+  return new Promise((resolve, reject) => {
     const validRows: T[] = [];
     let totalRows = 0;
     let invalidRows = 0;
     let streamEnded = false;
 
-    const input = fs.createReadStream(filePath).on('error', reject);
-    const gunzip = zlib.createGunzip().on('error', reject);
-
-    const parser = createParser<T>(DELIMITERS[format], (row) => {
+    const parser = createParser<T>(delimiter, (row) => {
       totalRows++;
       const result = zodSchema.safeParse(row);
-
       if (result.success) validRows.push(result.data);
       else invalidRows++;
+    });
+
+    parser.on('end', () => {
+      streamEnded = true;
     });
 
     const onStreamClose = () => {
@@ -54,9 +50,8 @@ export const parseCompressedFile = async <T>(
 
     streamHandler(
       parser,
-      () => {}, // No additional action on data
+      () => {}, // No action on data
       () => {
-        streamEnded = true;
         resolve({
           data: validRows,
           meta: {
@@ -70,18 +65,43 @@ export const parseCompressedFile = async <T>(
       reject,
     );
 
-    input.pipe(gunzip).on('close', onStreamClose).pipe(parser);
+    stream.on('close', onStreamClose).pipe(parser);
   });
-
-  return await handlePromise(promise, { filePath, format });
 };
 
 /**
- * Parses CSV/TSV file content with Zod validation.
+ * Parses a file or raw content (optionally compressed) and validates with Zod schema.
  */
-export const parseCsvOrTsvFile = async <T>(
-  fileContent: string,
-  format: Format,
+export const parseFile = async <T>(
+  source: string | Buffer,
+  format: keyof typeof DELIMITERS,
+  zodSchema: ZodSchema<T>,
+  isCompressed = false,
+): ReturnCatchErrorType<ParseResult<T>> => {
+  const promise = new Promise<ParseResult<T>>((resolve, reject) => {
+    const stream =
+      typeof source === 'string'
+        ? fs.createReadStream(source).on('error', reject)
+        : Readable.from(source);
+
+    const finalStream = isCompressed
+      ? stream.pipe(zlib.createGunzip().on('error', reject))
+      : stream;
+
+    processStream(finalStream, DELIMITERS[format], zodSchema)
+      .then(resolve)
+      .catch(reject);
+  });
+
+  return await handlePromise(promise, { source, format });
+};
+
+/**
+ * Parses raw CSV/TSV content directly.
+ */
+export const parseRawContent = async <T>(
+  content: string,
+  format: keyof typeof DELIMITERS,
   zodSchema: ZodSchema<T>,
 ): ReturnCatchErrorType<ParseResult<T>> => {
   const promise = new Promise<ParseResult<T>>((resolve, reject) => {
@@ -98,7 +118,7 @@ export const parseCsvOrTsvFile = async <T>(
 
     streamHandler(
       parser,
-      () => {}, // No additional action on data
+      () => {}, // No action on data
       () => {
         resolve({
           data: validRows,
@@ -113,7 +133,7 @@ export const parseCsvOrTsvFile = async <T>(
       reject,
     );
 
-    parser.write(fileContent);
+    parser.write(content);
     parser.end();
   });
 

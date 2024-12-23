@@ -6,10 +6,10 @@ import zlib from 'node:zlib';
 import sinon from 'sinon';
 import type { SinonStub } from 'sinon';
 import { z } from 'zod';
-import { parseCompressedFile, parseCsvOrTsvFile } from './fileHelper';
+import { parseFile, parseRawContent } from './fileHelper';
 
 describe('fileHelper tests', () => {
-  describe('parseCompressedFile', () => {
+  describe('parse compressed file', () => {
     let fsMock: SinonStub;
     let zlibMock: SinonStub;
     let parseMock: SinonStub;
@@ -67,10 +67,11 @@ describe('fileHelper tests', () => {
         gunzipStream.end();
       });
 
-      const [error, result] = await parseCompressedFile(
+      const [error, result] = await parseFile(
         './test-file.tsv.gz',
         'tsv',
         schemaWithHeader,
+        true,
       );
 
       assert.strictEqual(error, undefined);
@@ -106,10 +107,11 @@ describe('fileHelper tests', () => {
       });
 
       // Call the function
-      const [error, rows] = await parseCompressedFile(
+      const [error, rows] = await parseFile(
         './malformed-file.tsv.gz',
         'tsv',
         schemaWithHeader,
+        true,
       );
 
       // Assertions
@@ -131,10 +133,11 @@ describe('fileHelper tests', () => {
         gunzipStream.end();
       });
 
-      const [, result] = await parseCompressedFile(
+      const [, result] = await parseFile(
         './empty-file.tsv.gz',
         'tsv',
         schemaWithHeader,
+        true,
       );
 
       assert.deepStrictEqual(result, {
@@ -158,10 +161,11 @@ describe('fileHelper tests', () => {
       });
 
       // Call the function
-      const [error, rows] = await parseCompressedFile(
+      const [error, rows] = await parseFile(
         './premature-close.tsv.gz',
         'tsv',
         schemaWithHeader,
+        true,
       );
 
       // Assertions
@@ -184,10 +188,11 @@ describe('fileHelper tests', () => {
         gunzipStream.end();
       });
 
-      const [, result] = await parseCompressedFile(
+      const [, result] = await parseFile(
         './test-file.tsv.gz',
         'tsv',
         schemaWithHeader,
+        true,
       );
 
       assert.deepStrictEqual(result, {
@@ -205,7 +210,7 @@ describe('fileHelper tests', () => {
     });
   });
 
-  describe('parseCsvOrTsvFile', () => {
+  describe('parse raw file', () => {
     it('should parse csv file with header row with all valid rows', async () => {
       const csvWithHeader = 'id,name,age\n1,John,30\n2,Jane,25\n3,Mary, -5';
       const schemaWithHeader = z.object({
@@ -217,11 +222,13 @@ describe('fileHelper tests', () => {
         ),
       });
 
-      const [error, result] = await parseCsvOrTsvFile(
+      const [error, result] = await parseRawContent(
         csvWithHeader,
         'csv',
         schemaWithHeader,
       );
+
+      console.log(error);
       assert.equal(error, undefined);
       assert.equal(result?.meta.totalRows, 3);
       assert.equal(result?.meta.validRows, 3);
@@ -246,7 +253,7 @@ describe('fileHelper tests', () => {
         ),
       });
 
-      const [error, result] = await parseCsvOrTsvFile(
+      const [error, result] = await parseRawContent(
         csvWithHeader,
         'csv',
         schemaWithHeader,
@@ -275,7 +282,7 @@ describe('fileHelper tests', () => {
         ),
       });
 
-      const [error, result] = await parseCsvOrTsvFile(
+      const [error, result] = await parseRawContent(
         malformedCsv,
         'csv',
         schema,

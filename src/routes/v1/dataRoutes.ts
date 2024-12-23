@@ -1,6 +1,6 @@
 import { type Request, type Response, Router } from 'express';
 import { dataFiles } from '../../database/config';
-import { parseCompressedFile } from '../../utils/fileHelper';
+import { parseFile } from '../../utils/fileHelper';
 
 const router = Router();
 
@@ -14,10 +14,11 @@ router.get('/:fileId', async (req: Request, res: Response) => {
   }
 
   try {
-    const [error, result] = await parseCompressedFile(
+    const [error, result] = await parseFile(
       fileConfig.path,
       fileConfig.format,
       fileConfig.schema,
+      true,
     );
 
     if (error) {
