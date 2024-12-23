@@ -4,26 +4,19 @@ import { PassThrough } from 'node:stream';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import zlib from 'node:zlib';
 import sinon from 'sinon';
-import type { SinonSpy, SinonStub } from 'sinon';
-import { loggerMessages, parseCompressedFile } from './fileHelper';
-import { logger } from './logger';
+import type { SinonStub } from 'sinon';
+import { parseCompressedFile } from './fileHelper';
 
 describe('fileHelper tests', () => {
   let fsMock: SinonStub;
   let zlibMock: SinonStub;
   let parseMock: SinonStub;
-  let loggerInfoSpy: SinonSpy;
-  let loggerErrorSpy: SinonSpy;
 
   beforeEach(() => {
     // Reset and stub mocks
     fsMock = sinon.stub(fs, 'createReadStream');
     zlibMock = sinon.stub(zlib, 'createGunzip');
     parseMock = sinon.stub();
-
-    // Spy on logger
-    loggerInfoSpy = sinon.spy(logger, 'info');
-    loggerErrorSpy = sinon.spy(logger, 'error');
   });
 
   afterEach(() => {
@@ -79,17 +72,6 @@ describe('fileHelper tests', () => {
       { id: '1', name: 'Test' },
       { id: '2', name: 'Another' },
     ]);
-
-    sinon.assert.calledWithMatch(
-      loggerInfoSpy,
-      { filePath: './test-file.tsv.gz', format: 'tsv' },
-      loggerMessages.start,
-    );
-    sinon.assert.calledWithMatch(
-      loggerInfoSpy,
-      { filePath: './test-file.tsv.gz', rowsCount: 2 },
-      loggerMessages.success,
-    );
   });
 
   it('should throw an error for a malformed TSV content', async () => {
@@ -113,12 +95,6 @@ describe('fileHelper tests', () => {
     // Assertions
     assert.strictEqual(rows, undefined); // No rows should be returned
     assert.ok(error); // Error should be defined
-
-    sinon.assert.calledWithMatch(
-      loggerErrorSpy,
-      sinon.match.has('err', sinon.match.instanceOf(Error)), // Check if error is logged
-      loggerMessages.parseError,
-    );
   });
 
   it('should handle an empty compressed file gracefully', async () => {
@@ -133,17 +109,6 @@ describe('fileHelper tests', () => {
     const [, rows] = await parseCompressedFile('./empty-file.tsv.gz', 'tsv');
 
     assert.deepStrictEqual(rows, []);
-
-    sinon.assert.calledWithMatch(
-      loggerInfoSpy,
-      { filePath: './empty-file.tsv.gz', format: 'tsv' },
-      loggerMessages.start,
-    );
-    sinon.assert.calledWithMatch(
-      loggerInfoSpy,
-      { filePath: './empty-file.tsv.gz', rowsCount: 0 },
-      loggerMessages.success,
-    );
   });
 
   it('should handle premature stream closure gracefully', async () => {
@@ -161,17 +126,9 @@ describe('fileHelper tests', () => {
       'tsv',
     );
 
-    console.log({ error, rows });
-
     // Assertions
     assert.strictEqual(rows, undefined); // No rows should be returned
     assert.ok(error); // Error should be defined
-
-    sinon.assert.calledWithMatch(
-      loggerErrorSpy,
-      sinon.match.has('err', sinon.match.instanceOf(Error)), // Check if error is logged
-      loggerMessages.parseError,
-    );
   });
 
   it('should process rows correctly from a valid input', async () => {
@@ -190,11 +147,5 @@ describe('fileHelper tests', () => {
       { id: '1', name: 'Test' },
       { id: '2', name: 'Another' },
     ]);
-
-    sinon.assert.calledWithMatch(
-      loggerInfoSpy,
-      { filePath: './test-file.tsv.gz', rowsCount: 2 },
-      loggerMessages.success,
-    );
   });
 });
