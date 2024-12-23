@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { Readable } from 'node:stream';
 import zlib from 'node:zlib';
-import type { ZodSchema } from 'zod';
+import type { ZodType } from 'zod';
 import { DELIMITERS } from '../constants/rawFiles';
 import type { ReturnCatchErrorType } from './catchError';
 import { createParser, handlePromise, streamHandler } from './helpers';
@@ -16,13 +16,15 @@ export interface ParseResult<T> {
   };
 }
 
+// TODO: fix delimiter type, use zodSchema to determine delimiter (see: doctorsRawSchema)
+
 /**
  * Processes a file stream with Zod validation.
  */
 const processStream = <T>(
   stream: NodeJS.ReadableStream,
   delimiter: string,
-  zodSchema: ZodSchema<T>,
+  zodSchema: ZodType<T>,
 ): Promise<ParseResult<T>> => {
   return new Promise((resolve, reject) => {
     const validRows: T[] = [];
@@ -75,7 +77,7 @@ const processStream = <T>(
 export const parseFile = async <T>(
   source: string | Buffer,
   format: keyof typeof DELIMITERS,
-  zodSchema: ZodSchema<T>,
+  zodSchema: ZodType<T>,
   isCompressed = false,
 ): ReturnCatchErrorType<ParseResult<T>> => {
   const promise = new Promise<ParseResult<T>>((resolve, reject) => {
@@ -102,7 +104,7 @@ export const parseFile = async <T>(
 export const parseRawContent = async <T>(
   content: string,
   format: keyof typeof DELIMITERS,
-  zodSchema: ZodSchema<T>,
+  zodSchema: ZodType<T>,
 ): ReturnCatchErrorType<ParseResult<T>> => {
   const promise = new Promise<ParseResult<T>>((resolve, reject) => {
     const validRows: T[] = [];
