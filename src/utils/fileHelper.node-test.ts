@@ -228,6 +228,8 @@ describe('fileHelper tests', () => {
         schema,
       );
 
+      console.log(error);
+
       // Assertions
       assert.ok(error); // An error should be returned
       assert.ok(error);

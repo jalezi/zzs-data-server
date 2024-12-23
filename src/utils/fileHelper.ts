@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import zlib from 'node:zlib';
 import { parse } from 'csv-parse';
 import type { ZodSchema } from 'zod';
-import { type ReturnCatchErrorType, catchError } from './catchError';
+import type { ReturnCatchErrorType } from './catchError';
 import { logger } from './logger';
 
 const DELIMITERS = {
@@ -20,78 +20,92 @@ export const loggerMessages = {
   streamClosed: 'Stream closed',
   success: 'File parsing completed',
   prematureEnd: 'Premature stream closure or unexpected end',
+} as const;
+
+/**
+ * Utility for creating parsers with error handling.
+ */
+const createParser = <T>(delimiter: string, processRow: (row: T) => void) => {
+  return parse({ delimiter, columns: true }).on('data', processRow);
+};
+
+/**
+ * Utility to handle stream events (data, end, error).
+ */
+const streamHandler = <T = unknown>(
+  stream: fs.ReadStream | zlib.Gunzip | ReturnType<typeof parse>,
+  onData: (chunk: T) => void,
+  onComplete: () => void,
+  onError: (err: Error) => void,
+) => {
+  stream.on('data', onData).on('end', onComplete).on('error', onError);
+};
+
+/**
+ * Handles promises with error catching and logging.
+ */
+const handlePromise = async <T>(
+  promise: Promise<T>,
+  loggerContext?: Record<string, unknown>,
+): Promise<ReturnCatchErrorType<T>> => {
+  try {
+    const result = await promise;
+    return [undefined, result];
+  } catch (err) {
+    logger.error({ ...loggerContext, err }, 'An error occurred');
+    if (err instanceof Error) return [err];
+    return [new Error('An unknown error occurred', { cause: err })];
+  }
 };
 
 /**
  * Parses a compressed file (gzip) and extracts its contents as an array of objects.
- *
- * @template T - The type of the objects in the resulting array. Defaults to `Record<string, unknown>`.
- *
- * @param {string} filePath - The path to the compressed file.
- * @param {'tsv' | 'csv'} format - The format of the file, either 'tsv' (tab-separated values) or 'csv' (comma-separated values).
- *
- * @returns {ReturnCatchErrorType<T[]>} A promise that resolves to an array of objects of type T, or rejects with an error.
- *
- * @throws Will throw an error if there is an issue reading the file, decompressing it, or parsing its contents.
- *
- * @example
- * ```typescript
- * const data = await parseCompressedFile<MyType>('/path/to/file.gz', 'csv');
- * console.log(data);
- * ```
  */
 export const parseCompressedFile = async <T = Record<string, unknown>>(
   filePath: string,
   format: Format,
 ): ReturnCatchErrorType<T[]> => {
-  const delimiter = DELIMITERS[format];
   logger.info({ filePath, format }, loggerMessages.start);
 
   const promise = new Promise<T[]>((resolve, reject) => {
     const rows: T[] = [];
     let streamEnded = false;
 
-    const input = fs.createReadStream(filePath).on('error', (err) => {
-      logger.error({ err, filePath }, loggerMessages.readError);
-      reject(err);
-    });
+    const input = fs.createReadStream(filePath).on('error', reject);
+    const gunzip = zlib.createGunzip().on('error', reject);
+    const parser = createParser<T>(DELIMITERS[format], (row) => rows.push(row));
 
-    const gunzip = zlib.createGunzip().on('error', (err) => {
-      logger.error({ err, filePath }, loggerMessages.decompressionError);
-      reject(err);
-    });
+    const onStreamClose = () => {
+      if (!streamEnded) {
+        const error = new Error(loggerMessages.prematureEnd);
+        logger.error({ filePath, err: error }, loggerMessages.parseError);
+        reject(error);
+      }
+    };
 
-    const parser = parse({ delimiter, columns: true })
-      .on('data', (row) => rows.push(row))
-      .on('end', () => {
+    streamHandler(
+      parser,
+      () => {}, // No additional action on data
+      () => {
         streamEnded = true;
         logger.info(
           { filePath, rowsCount: rows.length },
           loggerMessages.success,
         );
         resolve(rows);
-      })
-      .on('error', (err) => {
-        logger.error({ err, filePath }, loggerMessages.parseError);
-        reject(err);
-      });
+      },
+      reject,
+    );
 
-    input
-      .pipe(gunzip)
-      .on('close', () => {
-        logger.debug({ filePath, streamEnded }, loggerMessages.streamClosed);
-        if (!streamEnded) {
-          const error = new Error(loggerMessages.prematureEnd);
-          logger.error({ err: error, filePath }, loggerMessages.parseError);
-          reject(error);
-        }
-      })
-      .pipe(parser);
+    input.pipe(gunzip).on('close', onStreamClose).pipe(parser);
   });
 
-  return await catchError<T[], new (message?: string) => Error>(promise);
+  return await handlePromise(promise, { filePath, format });
 };
 
+/**
+ * Result type for parsed CSV/TSV files.
+ */
 export interface ParseResult<T> {
   data: T[];
   meta: {
@@ -102,29 +116,30 @@ export interface ParseResult<T> {
   };
 }
 
+/**
+ * Parses CSV/TSV file content with Zod validation.
+ */
 export const parseCsvOrTsvFile = async <T>(
   fileContent: string,
   format: Format,
   zodSchema: ZodSchema<T>,
-) => {
-  const delimiter = DELIMITERS[format];
-
+): ReturnCatchErrorType<ParseResult<T>> => {
   const promise = new Promise<ParseResult<T>>((resolve, reject) => {
     const validRows: T[] = [];
     let totalRows = 0;
     let invalidRows = 0;
 
-    const parser = parse({ delimiter, columns: true })
-      .on('data', (row) => {
-        totalRows++;
-        const parsedRow = zodSchema.safeParse(row);
-        if (parsedRow.success) {
-          validRows.push(parsedRow.data);
-        } else {
-          invalidRows++;
-        }
-      })
-      .on('end', () =>
+    const parser = createParser<T>(DELIMITERS[format], (row) => {
+      totalRows++;
+      const result = zodSchema.safeParse(row);
+      if (result.success) validRows.push(result.data);
+      else invalidRows++;
+    });
+
+    streamHandler(
+      parser,
+      () => {}, // No additional action on data
+      () => {
         resolve({
           data: validRows,
           meta: {
@@ -133,15 +148,14 @@ export const parseCsvOrTsvFile = async <T>(
             invalidRows,
             allValid: invalidRows === 0,
           },
-        }),
-      )
-      .on('error', (err) => reject(err));
+        });
+      },
+      reject,
+    );
 
     parser.write(fileContent);
     parser.end();
   });
 
-  return await catchError<ParseResult<T>, new (message?: string) => Error>(
-    promise,
-  );
+  return await handlePromise(promise, { format });
 };
