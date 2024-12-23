@@ -4,7 +4,7 @@ type DataFile = {
   id: string;
   path: `./database/${string}.tsv.gz` | `./database/${string}.csv.gz`;
   format: 'tsv' | 'csv';
-  schema?: z.ZodSchema;
+  schema: z.ZodSchema;
 };
 
 const usersSchema = z.object({
