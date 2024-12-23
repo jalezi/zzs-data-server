@@ -1,52 +1,24 @@
 import fs from 'node:fs';
 import zlib from 'node:zlib';
-import { parse } from 'csv-parse';
 import type { ZodSchema } from 'zod';
+import { DELIMITERS } from '../constants/rawFiles';
 import type { ReturnCatchErrorType } from './catchError';
-import { logger } from './logger';
-
-const DELIMITERS = {
-  tsv: '\t',
-  csv: ',',
-} as const;
+import { createParser, handlePromise, streamHandler } from './helpers';
 
 type Format = keyof typeof DELIMITERS;
 
 /**
- * Utility for creating parsers with error handling.
+ * Result type for parsed CSV/TSV files.
  */
-const createParser = <T>(delimiter: string, processRow: (row: T) => void) => {
-  return parse({ delimiter, columns: true }).on('data', processRow);
-};
-
-/**
- * Utility to handle stream events (data, end, error).
- */
-const streamHandler = <T = unknown>(
-  stream: fs.ReadStream | zlib.Gunzip | ReturnType<typeof parse>,
-  onData: (chunk: T) => void,
-  onComplete: () => void,
-  onError: (err: Error) => void,
-) => {
-  stream.on('data', onData).on('end', onComplete).on('error', onError);
-};
-
-/**
- * Handles promises with error catching and logging.
- */
-const handlePromise = async <T>(
-  promise: Promise<T>,
-  loggerContext?: Record<string, unknown>,
-): Promise<ReturnCatchErrorType<T>> => {
-  try {
-    const result = await promise;
-    return [undefined, result];
-  } catch (err) {
-    logger.error({ ...loggerContext, err }, 'An error occurred');
-    if (err instanceof Error) return [err];
-    return [new Error('Unknown', { cause: err })];
-  }
-};
+export interface ParseResult<T> {
+  data: T[];
+  meta: {
+    totalRows: number;
+    validRows: number;
+    invalidRows: number;
+    allValid: boolean;
+  };
+}
 
 /**
  * Parses a compressed file (gzip) and extracts its contents as an array of objects.
@@ -68,6 +40,7 @@ export const parseCompressedFile = async <T>(
     const parser = createParser<T>(DELIMITERS[format], (row) => {
       totalRows++;
       const result = zodSchema.safeParse(row);
+
       if (result.success) validRows.push(result.data);
       else invalidRows++;
     });
@@ -102,19 +75,6 @@ export const parseCompressedFile = async <T>(
 
   return await handlePromise(promise, { filePath, format });
 };
-
-/**
- * Result type for parsed CSV/TSV files.
- */
-export interface ParseResult<T> {
-  data: T[];
-  meta: {
-    totalRows: number;
-    validRows: number;
-    invalidRows: number;
-    allValid: boolean;
-  };
-}
 
 /**
  * Parses CSV/TSV file content with Zod validation.
