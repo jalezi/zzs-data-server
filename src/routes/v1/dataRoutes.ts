@@ -14,7 +14,15 @@ router.get('/:fileId', async (req: Request, res: Response) => {
   }
 
   try {
-    const data = await parseCompressedFile(fileConfig.path, fileConfig.format);
+    const [error, data] = await parseCompressedFile(
+      fileConfig.path,
+      fileConfig.format,
+    );
+
+    if (error) {
+      throw error;
+    }
+
     res.json({ success: true, data });
   } catch (err) {
     res
