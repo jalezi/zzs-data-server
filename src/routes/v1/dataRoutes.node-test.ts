@@ -17,9 +17,9 @@ const mockedConfig = {
 const mockedFileHelper = {
   parseCompressedFile: (path: string, _format: string) => {
     if (path.includes('file1'))
-      return [undefined, [{ id: 1, name: 'Test Data 1' }]];
+      return [undefined, { data: [{ id: 1, name: 'Test Data 1' }] }];
     if (path.includes('file2'))
-      return [undefined, [{ id: 2, name: 'Test Data 2' }]];
+      return [undefined, { data: [{ id: 2, name: 'Test Data 2' }] }];
     if (path.includes('file3')) throw new Error('Failed to parse');
     throw new Error('Failed to parse');
   },

@@ -56,6 +56,10 @@ describe('fileHelper tests', () => {
       const { mockStream, gunzipStream } = setupMocks(
         'id\tname\n1\tTest\n2\tAnother\n',
       );
+      const schemaWithHeader = z.object({
+        id: z.string().nonempty(),
+        name: z.string().nonempty(),
+      });
 
       // Simulate file content piping
       setImmediate(() => {
@@ -63,23 +67,37 @@ describe('fileHelper tests', () => {
         gunzipStream.end();
       });
 
-      const [error, rows] = await parseCompressedFile(
+      const [error, result] = await parseCompressedFile(
         './test-file.tsv.gz',
         'tsv',
+        schemaWithHeader,
       );
 
       assert.strictEqual(error, undefined);
 
-      assert.deepStrictEqual(rows, [
-        { id: '1', name: 'Test' },
-        { id: '2', name: 'Another' },
-      ]);
+      assert.deepStrictEqual(result, {
+        data: [
+          { id: '1', name: 'Test' },
+          { id: '2', name: 'Another' },
+        ],
+        meta: {
+          totalRows: 2,
+          validRows: 2,
+          invalidRows: 0,
+          allValid: true,
+        },
+      });
     });
 
     it('should throw an error for a malformed TSV content', async () => {
       // Simulate a malformed TSV file with inconsistent columns
       const malformedContent = 'id\tname\n1\tTest\n2'; // Missing 'name' column in the second row
       const { mockStream, gunzipStream } = setupMocks(malformedContent);
+
+      const schemaWithHeader = z.object({
+        id: z.string().nonempty(),
+        name: z.string().nonempty(),
+      });
 
       // Simulate file content piping
       setImmediate(() => {
@@ -91,8 +109,8 @@ describe('fileHelper tests', () => {
       const [error, rows] = await parseCompressedFile(
         './malformed-file.tsv.gz',
         'tsv',
+        schemaWithHeader,
       );
-      console.log(error);
 
       // Assertions
       assert.strictEqual(rows, undefined); // No rows should be returned
@@ -102,19 +120,36 @@ describe('fileHelper tests', () => {
     it('should handle an empty compressed file gracefully', async () => {
       const { mockStream, gunzipStream } = setupMocks('');
 
+      const schemaWithHeader = z.object({
+        id: z.string().nonempty(),
+        name: z.string().nonempty(),
+      });
+
       // Simulate file content piping
       setImmediate(() => {
         mockStream.pipe(gunzipStream);
         gunzipStream.end();
       });
 
-      const [, rows] = await parseCompressedFile('./empty-file.tsv.gz', 'tsv');
+      const [, result] = await parseCompressedFile(
+        './empty-file.tsv.gz',
+        'tsv',
+        schemaWithHeader,
+      );
 
-      assert.deepStrictEqual(rows, []);
+      assert.deepStrictEqual(result, {
+        data: [],
+        meta: { totalRows: 0, validRows: 0, invalidRows: 0, allValid: true },
+      });
     });
 
     it('should handle premature stream closure gracefully', async () => {
       const { mockStream, gunzipStream } = setupMocks();
+
+      const schemaWithHeader = z.object({
+        id: z.string().nonempty(),
+        name: z.string().nonempty(),
+      });
 
       // Simulate premature stream closure
       setImmediate(() => {
@@ -126,6 +161,7 @@ describe('fileHelper tests', () => {
       const [error, rows] = await parseCompressedFile(
         './premature-close.tsv.gz',
         'tsv',
+        schemaWithHeader,
       );
 
       // Assertions
@@ -137,18 +173,35 @@ describe('fileHelper tests', () => {
       const fileContent = 'id\tname\n1\tTest\n2\tAnother\n';
       const { mockStream, gunzipStream } = setupMocks(fileContent);
 
+      const schemaWithHeader = z.object({
+        id: z.string().nonempty(),
+        name: z.string().nonempty(),
+      });
+
       // Simulate file content piping
       setImmediate(() => {
         mockStream.pipe(gunzipStream);
         gunzipStream.end();
       });
 
-      const [, rows] = await parseCompressedFile('./test-file.tsv.gz', 'tsv');
+      const [, result] = await parseCompressedFile(
+        './test-file.tsv.gz',
+        'tsv',
+        schemaWithHeader,
+      );
 
-      assert.deepStrictEqual(rows, [
-        { id: '1', name: 'Test' },
-        { id: '2', name: 'Another' },
-      ]);
+      assert.deepStrictEqual(result, {
+        data: [
+          { id: '1', name: 'Test' },
+          { id: '2', name: 'Another' },
+        ],
+        meta: {
+          totalRows: 2,
+          validRows: 2,
+          invalidRows: 0,
+          allValid: true,
+        },
+      });
     });
   });
 

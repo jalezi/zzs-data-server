@@ -61,19 +61,28 @@ const handlePromise = async <T>(
 /**
  * Parses a compressed file (gzip) and extracts its contents as an array of objects.
  */
-export const parseCompressedFile = async <T = Record<string, unknown>>(
+export const parseCompressedFile = async <T>(
   filePath: string,
   format: Format,
-): ReturnCatchErrorType<T[]> => {
+  zodSchema: ZodSchema<T>,
+): ReturnCatchErrorType<ParseResult<T>> => {
   logger.info({ filePath, format }, loggerMessages.start);
 
-  const promise = new Promise<T[]>((resolve, reject) => {
-    const rows: T[] = [];
+  const promise = new Promise<ParseResult<T>>((resolve, reject) => {
+    const validRows: T[] = [];
+    let totalRows = 0;
+    let invalidRows = 0;
     let streamEnded = false;
 
     const input = fs.createReadStream(filePath).on('error', reject);
     const gunzip = zlib.createGunzip().on('error', reject);
-    const parser = createParser<T>(DELIMITERS[format], (row) => rows.push(row));
+
+    const parser = createParser<T>(DELIMITERS[format], (row) => {
+      totalRows++;
+      const result = zodSchema.safeParse(row);
+      if (result.success) validRows.push(result.data);
+      else invalidRows++;
+    });
 
     const onStreamClose = () => {
       if (!streamEnded) {
@@ -89,10 +98,18 @@ export const parseCompressedFile = async <T = Record<string, unknown>>(
       () => {
         streamEnded = true;
         logger.info(
-          { filePath, rowsCount: rows.length },
+          { filePath, rowsCount: validRows.length },
           loggerMessages.success,
         );
-        resolve(rows);
+        resolve({
+          data: validRows,
+          meta: {
+            totalRows,
+            validRows: validRows.length,
+            invalidRows,
+            allValid: invalidRows === 0,
+          },
+        });
       },
       reject,
     );
