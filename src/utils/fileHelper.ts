@@ -66,8 +66,6 @@ export const parseCompressedFile = async <T>(
   format: Format,
   zodSchema: ZodSchema<T>,
 ): ReturnCatchErrorType<ParseResult<T>> => {
-  logger.info({ filePath, format }, loggerMessages.start);
-
   const promise = new Promise<ParseResult<T>>((resolve, reject) => {
     const validRows: T[] = [];
     let totalRows = 0;
@@ -87,7 +85,6 @@ export const parseCompressedFile = async <T>(
     const onStreamClose = () => {
       if (!streamEnded) {
         const error = new Error(loggerMessages.prematureEnd);
-        logger.error({ filePath, err: error }, loggerMessages.parseError);
         reject(error);
       }
     };
@@ -97,10 +94,6 @@ export const parseCompressedFile = async <T>(
       () => {}, // No additional action on data
       () => {
         streamEnded = true;
-        logger.info(
-          { filePath, rowsCount: validRows.length },
-          loggerMessages.success,
-        );
         resolve({
           data: validRows,
           meta: {
