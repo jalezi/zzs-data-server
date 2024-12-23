@@ -1,8 +1,16 @@
 import fs from 'node:fs';
 import zlib from 'node:zlib';
 import { parse } from 'csv-parse';
+import type { ZodSchema } from 'zod';
 import { type ReturnCatchErrorType, catchError } from './catchError';
 import { logger } from './logger';
+
+const DELIMITERS = {
+  tsv: '\t',
+  csv: ',',
+} as const;
+
+type Format = keyof typeof DELIMITERS;
 
 export const loggerMessages = {
   start: 'Starting file parsing',
@@ -34,9 +42,9 @@ export const loggerMessages = {
  */
 export const parseCompressedFile = async <T = Record<string, unknown>>(
   filePath: string,
-  format: 'tsv' | 'csv',
+  format: Format,
 ): ReturnCatchErrorType<T[]> => {
-  const delimiter = format === 'tsv' ? '\t' : ',';
+  const delimiter = DELIMITERS[format];
   logger.info({ filePath, format }, loggerMessages.start);
 
   const promise = new Promise<T[]>((resolve, reject) => {
@@ -82,4 +90,58 @@ export const parseCompressedFile = async <T = Record<string, unknown>>(
   });
 
   return await catchError<T[], new (message?: string) => Error>(promise);
+};
+
+export interface ParseResult<T> {
+  data: T[];
+  meta: {
+    totalRows: number;
+    validRows: number;
+    invalidRows: number;
+    allValid: boolean;
+  };
+}
+
+export const parseCsvOrTsvFile = async <T>(
+  fileContent: string,
+  format: Format,
+  zodSchema: ZodSchema<T>,
+) => {
+  const delimiter = DELIMITERS[format];
+
+  const promise = new Promise<ParseResult<T>>((resolve, reject) => {
+    const validRows: T[] = [];
+    let totalRows = 0;
+    let invalidRows = 0;
+
+    const parser = parse({ delimiter, columns: true })
+      .on('data', (row) => {
+        totalRows++;
+        const parsedRow = zodSchema.safeParse(row);
+        if (parsedRow.success) {
+          validRows.push(parsedRow.data);
+        } else {
+          invalidRows++;
+        }
+      })
+      .on('end', () =>
+        resolve({
+          data: validRows,
+          meta: {
+            totalRows,
+            validRows: validRows.length,
+            invalidRows,
+            allValid: invalidRows === 0,
+          },
+        }),
+      )
+      .on('error', (err) => reject(err));
+
+    parser.write(fileContent);
+    parser.end();
+  });
+
+  return await catchError<ParseResult<T>, new (message?: string) => Error>(
+    promise,
+  );
 };
