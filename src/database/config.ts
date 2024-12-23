@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
-type DataFile = {
+type DataFile<T extends z.ZodTypeAny> = {
   id: string;
   path: `./database/${string}.tsv.gz` | `./database/${string}.csv.gz`;
   format: 'tsv' | 'csv';
-  schema: z.ZodSchema;
+  schema: T;
 };
 
 const usersSchema = z.object({
@@ -22,7 +22,7 @@ const productsSchema = z.object({
   ),
 });
 
-export const dataFiles = [
+export const dataFiles: DataFile<z.ZodSchema>[] = [
   {
     id: 'users',
     path: './database/users.tsv.gz',
@@ -35,4 +35,4 @@ export const dataFiles = [
     format: 'csv',
     schema: productsSchema,
   },
-] satisfies DataFile[];
+];
