@@ -11,12 +11,12 @@ import { fetchTextFile } from '../../utils/fetchTextFile';
 import { logger } from '../../utils/logger';
 import {
   getCacheWithTTL,
-  getInstitutionsMap,
   isCachedData,
   setCacheWithTTL,
 } from './helpers/cacheUtils';
 import { sendErrorResponse } from './helpers/errorUtils';
 import { fetchAndParseWithCache } from './helpers/fetchHelpers';
+import { mergeDoctorsAndInstitutions } from './helpers/mergeHelper';
 import {
   type CachedData,
   type Doctor,
@@ -147,12 +147,11 @@ router.get('/', async (_req: Request, res: Response) => {
     return;
   }
 
-  const institutionsMap = getInstitutionsMap(institutions, ts.institutionsTs);
-
-  const mergedData = doctors.map((doctor) => ({
-    ...doctor,
-    institution: institutionsMap.get(doctor.id_inst) || null,
-  }));
+  const mergedData = mergeDoctorsAndInstitutions(
+    doctors,
+    institutions,
+    ts.institutionsTs,
+  );
 
   const responseData: CachedData = {
     timestamps: ts,
