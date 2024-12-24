@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { DOCTORS, INSTITUTIONS } from '../../constants/doctors';
+import { calculateExecutionTime } from '../../utils/helpers';
 import { logger } from '../../utils/logger';
 import {
   getCacheWithTTL,
@@ -30,10 +31,6 @@ const router = Router();
 const mergedDataCache = new Map<string, CachedData>();
 const doctorsCache = new Map<string, Doctor[]>();
 const institutionsCache = new Map<string, Institution[]>();
-
-function calculateExecutionTime(startTime: number): string {
-  return `${Date.now() - startTime}ms`;
-}
 
 // Main Route
 router.get('/', async (_req: Request, res: Response) => {
@@ -66,13 +63,7 @@ router.get('/', async (_req: Request, res: Response) => {
       );
       mergedDataCache.delete(cacheKey);
     } else {
-      childLogger.info(
-        {
-          cacheKey,
-          executionTime: calculateExecutionTime(startTime),
-        },
-        'Serving merged data from cache',
-      );
+      childLogger.info({ cacheKey }, 'Serving merged data from cache');
       sendSuccess(
         res,
         cachedData.data,

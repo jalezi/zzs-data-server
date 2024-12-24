@@ -1,4 +1,5 @@
 import type { Response } from 'express';
+import { calculateExecutionTime } from '../../../utils/helpers';
 
 export function sendErrorResponse(
   res: Response,
@@ -23,10 +24,6 @@ export function sendSuccessResponse<T>(
     meta,
     ...data,
   });
-}
-
-function calculateExecutionTime(startTime: number): string {
-  return `${Date.now() - startTime}ms`;
 }
 
 export function sendError(

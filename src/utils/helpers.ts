@@ -45,3 +45,7 @@ export const handlePromise = async <T>(
     return [new Error('Unknown error', { cause: err })];
   }
 };
+
+export function calculateExecutionTime(startTime: number): string {
+  return `${Date.now() - startTime}ms`;
+}
