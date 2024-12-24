@@ -53,7 +53,6 @@ export type Timestamps = {
 };
 
 export type Meta = {
-  cacheHit: boolean;
   doctorsCount: number;
   institutionsCount: number;
   mergedCount: number;

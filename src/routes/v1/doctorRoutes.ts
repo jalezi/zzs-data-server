@@ -1,20 +1,16 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import {
-  DOCTORS,
-  DOCTORS_TS,
-  INSTITUTIONS,
-  INSTITUTIONS_TS,
-} from '../../constants/doctors';
-import type { ReturnCatchErrorType } from '../../utils/catchError';
-import { fetchTextFile } from '../../utils/fetchTextFile';
+import { DOCTORS, INSTITUTIONS } from '../../constants/doctors';
 import { logger } from '../../utils/logger';
 import {
   getCacheWithTTL,
   isCachedData,
   setCacheWithTTL,
 } from './helpers/cacheUtils';
-import { fetchAndParseWithCache } from './helpers/fetchHelpers';
+import {
+  fetchAndParseWithCache,
+  fetchTimestamps,
+} from './helpers/fetchHelpers';
 import { mergeDoctorsAndInstitutions } from './helpers/mergeHelper';
 import {
   sendErrorResponse,
@@ -24,7 +20,6 @@ import {
   type CachedData,
   type Doctor,
   type Institution,
-  type Timestamps,
   doctorsRawSchema,
   institutionsRawSchema,
 } from './helpers/schemas/doctorRoutes';
@@ -41,41 +36,6 @@ const institutionsCache = new Map<string, Institution[]>();
 
 function calculateExecutionTime(startTime: number): string {
   return `${Date.now() - startTime}ms`;
-}
-
-// Utility: Fetch Timestamps
-async function fetchTimestamps(): Promise<ReturnCatchErrorType<Timestamps>> {
-  const [doctorsTsResult, institutionsTsResult] = await Promise.all([
-    fetchTextFile(DOCTORS_TS.href),
-    fetchTextFile(INSTITUTIONS_TS.href),
-  ]);
-
-  const [doctorsTsError, doctorsTsRaw] = doctorsTsResult;
-  const [institutionsTsError, institutionsTsRaw] = institutionsTsResult;
-
-  if (doctorsTsError || institutionsTsError) {
-    childLogger.error(
-      {
-        doctorsTsError,
-        institutionsTsError,
-        urls: {
-          doctorsTsUrl: DOCTORS_TS.href,
-          institutionsTsUrl: INSTITUTIONS_TS.href,
-        },
-      },
-      'Failed to fetch timestamps',
-    );
-    return [doctorsTsError || institutionsTsError];
-  }
-
-  const doctorsTs = doctorsTsRaw?.trim() || null;
-  const institutionsTs = institutionsTsRaw?.trim() || null;
-
-  childLogger.info(
-    { doctorsTs, institutionsTs },
-    'Successfully fetched timestamps',
-  );
-  return [undefined, { doctorsTs, institutionsTs }];
 }
 
 // Main Route
@@ -105,14 +65,11 @@ router.get('/', async (_req: Request, res: Response) => {
         { cacheKey },
         'Invalid cached data format, ignoring cache',
       );
+      mergedDataCache.delete(cacheKey);
     } else {
       childLogger.info(
         {
           cacheKey,
-          timestamps: ts,
-          doctorsCount: cachedData.meta.doctorsCount,
-          institutionsCount: cachedData.meta.institutionsCount,
-          mergedCount: cachedData.meta.mergedCount,
           executionTime: calculateExecutionTime(startTime),
         },
         'Serving merged data from cache',
@@ -174,7 +131,6 @@ router.get('/', async (_req: Request, res: Response) => {
     data: mergedData,
     meta: {
       timestamps: ts,
-      cacheHit: false,
       doctorsCount: doctors.length,
       institutionsCount: institutions.length,
       mergedCount: mergedData.length,
@@ -193,6 +149,7 @@ router.get('/', async (_req: Request, res: Response) => {
     { data: mergedData },
     {
       ...responseData.meta,
+      cacheHit: false,
       executionTime: calculateExecutionTime(startTime),
     },
   );
