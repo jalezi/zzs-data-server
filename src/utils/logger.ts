@@ -2,10 +2,12 @@ import pino from 'pino';
 import pinoHttp from 'pino-http';
 
 const logger = pino({
+  name: 'express-api',
   transport: {
     target: 'pino-pretty', // Pretty logs for development
     options: {
       colorize: true, // Colorize output
+      ignore: 'pid,hostname', // Ignore
     },
   },
   level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',

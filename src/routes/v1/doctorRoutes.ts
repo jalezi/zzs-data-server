@@ -29,6 +29,9 @@ import {
   institutionsRawSchema,
 } from './helpers/schemas/doctorRoutes';
 
+const childLogger = logger.child({
+  name: 'doctorRoutes',
+});
 const router = Router();
 
 // Caches
@@ -51,7 +54,7 @@ async function fetchTimestamps(): Promise<ReturnCatchErrorType<Timestamps>> {
   const [institutionsTsError, institutionsTsRaw] = institutionsTsResult;
 
   if (doctorsTsError || institutionsTsError) {
-    logger.error(
+    childLogger.error(
       {
         doctorsTsError,
         institutionsTsError,
@@ -68,7 +71,10 @@ async function fetchTimestamps(): Promise<ReturnCatchErrorType<Timestamps>> {
   const doctorsTs = doctorsTsRaw?.trim() || null;
   const institutionsTs = institutionsTsRaw?.trim() || null;
 
-  logger.info({ doctorsTs, institutionsTs }, 'Successfully fetched timestamps');
+  childLogger.info(
+    { doctorsTs, institutionsTs },
+    'Successfully fetched timestamps',
+  );
   return [undefined, { doctorsTs, institutionsTs }];
 }
 
@@ -78,7 +84,7 @@ router.get('/', async (_req: Request, res: Response) => {
 
   const [timestampError, ts] = await fetchTimestamps();
   if (timestampError || !ts?.doctorsTs || !ts?.institutionsTs) {
-    logger.error({ error: timestampError }, 'Failed to fetch timestamps');
+    childLogger.error({ error: timestampError }, 'Failed to fetch timestamps');
     sendErrorResponse(res, 500, 'Failed to fetch timestamps', {
       timestamps: ts,
       cacheHit: false,
@@ -89,12 +95,18 @@ router.get('/', async (_req: Request, res: Response) => {
 
   const cacheKey = `${ts.doctorsTs}-${ts.institutionsTs}`;
   const cachedData = getCacheWithTTL(mergedDataCache, cacheKey);
-  logger.debug({ cacheKey, cachedData: !!cachedData }, 'Cached data');
+  childLogger.debug(
+    { cacheKey, cachedData: !!cachedData },
+    'Cached data exists',
+  );
   if (cachedData) {
     if (!isCachedData(cachedData)) {
-      logger.warn({ cacheKey }, 'Invalid cached data format, ignoring cache');
+      childLogger.warn(
+        { cacheKey },
+        'Invalid cached data format, ignoring cache',
+      );
     } else {
-      logger.info(
+      childLogger.info(
         {
           cacheKey,
           timestamps: ts,
@@ -134,7 +146,7 @@ router.get('/', async (_req: Request, res: Response) => {
   );
 
   if (doctorsError || institutionsError || !doctors || !institutions) {
-    logger.error(
+    childLogger.error(
       {
         doctorsError,
         institutionsError,
@@ -170,7 +182,10 @@ router.get('/', async (_req: Request, res: Response) => {
     },
   };
 
-  logger.info(responseData.meta, 'Successfully merged and cached new data');
+  childLogger.info(
+    responseData.meta,
+    'Successfully merged and cached new data',
+  );
   setCacheWithTTL(mergedDataCache, cacheKey, responseData);
 
   sendSuccessResponse(

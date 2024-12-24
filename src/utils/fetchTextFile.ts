@@ -1,6 +1,10 @@
 import type { ReturnCatchErrorType } from './catchError';
 import { logger } from './logger';
 
+const childLogger = logger.child({
+  name: 'fetchTextFile',
+});
+
 /**
  * Fetches a text file from a given URL.
  */
@@ -10,7 +14,9 @@ export const fetchTextFile = async (
   const response = await fetch(url);
 
   if (!response.ok) {
-    logger.error(`Failed to fetch file from ${url}: ${response.statusText}`);
+    childLogger.error(
+      `Failed to fetch file from ${url}: ${response.statusText}`,
+    );
     const error = new Error(
       `Failed to fetch file from ${url}: ${response.statusText}`,
     );
@@ -19,14 +25,14 @@ export const fetchTextFile = async (
 
   const contentType = response.headers.get('content-type');
   if (!contentType || !contentType.includes('text/plain')) {
-    logger.error(`Invalid content type: ${contentType}`);
+    childLogger.error(`Invalid content type: ${contentType}`);
     const error = new Error(`Invalid content type: ${contentType}`);
     return [error];
   }
 
   const contentLength = response.headers.get('content-length');
   if (!contentLength) {
-    logger.error('Content length is missing');
+    childLogger.error('Content length is missing');
     const error = new Error('Content length is missing');
     return [error];
   }

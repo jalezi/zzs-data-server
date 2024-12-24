@@ -5,6 +5,10 @@ import { parseRawContent } from '../../../utils/fileHelper';
 import { logger } from '../../../utils/logger';
 import { getCacheWithTTL, setCacheWithTTL } from './cacheUtils';
 
+const childLogger = logger.child({
+  name: 'fetchHelpers',
+});
+
 // Utility: Fetch and Parse with Cache
 export async function fetchAndParseWithCache<T>(
   url: string,
@@ -14,13 +18,16 @@ export async function fetchAndParseWithCache<T>(
 ): Promise<ReturnCatchErrorType<T[]>> {
   const cachedData = getCacheWithTTL(cache, timestamp);
   if (cachedData) {
-    logger.info({ timestamp, url }, 'Serving data from cache');
+    childLogger.info({ timestamp, url }, 'Serving data from cache');
     return [undefined, cachedData];
   }
 
   const [fetchError, rawContent] = await fetchTextFile(url);
   if (fetchError || !rawContent) {
-    logger.error({ url, error: fetchError }, 'Failed to fetch raw content');
+    childLogger.error(
+      { url, error: fetchError },
+      'Failed to fetch raw content',
+    );
     return [fetchError || new Error('Empty file')];
   }
 
@@ -30,7 +37,10 @@ export async function fetchAndParseWithCache<T>(
     schema,
   );
   if (parseError || !parsedData) {
-    logger.error({ url, error: parseError }, 'Failed to parse raw content');
+    childLogger.error(
+      { url, error: parseError },
+      'Failed to parse raw content',
+    );
     return [parseError || new Error('Parsing error')];
   }
 

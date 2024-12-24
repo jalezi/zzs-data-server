@@ -4,6 +4,8 @@ import { parse } from 'csv-parse';
 import type { Options as CsvParseOptions } from 'csv-parse';
 import type { ReturnCatchErrorType } from './catchError';
 
+const childLogger = logger.child({ name: 'helpers' });
+
 /**
  * Utility for creating parsers with error handling.
  */
@@ -38,7 +40,7 @@ export const handlePromise = async <T>(
     const result = await promise;
     return [undefined, result];
   } catch (err) {
-    logger.error({ ...loggerContext, err }, 'An error occurred');
+    childLogger.error({ ...loggerContext, err }, 'An error occurred');
     if (err instanceof Error) return [err];
     return [new Error('Unknown error', { cause: err })];
   }

@@ -1,6 +1,8 @@
 import { logger } from '../../../utils/logger';
 import type { CachedData, Institution } from './schemas/doctorRoutes';
 
+const childLogger = logger.child({ name: 'cacheUtils' });
+
 // Cache Expiry with Typed Key Handling
 const cacheExpiry = new Map<string, number>();
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes TTL
@@ -19,7 +21,10 @@ export function setCacheWithTTL<K extends string | number | symbol, V>(
     const oldestKey = [...cache.keys()][0];
     cache.delete(oldestKey);
     cacheExpiry.delete(String(oldestKey));
-    logger.info({ oldestKey }, 'Evicted oldest cache entry due to size limit');
+    childLogger.info(
+      { oldestKey },
+      'Evicted oldest cache entry due to size limit',
+    );
   }
 }
 
@@ -37,17 +42,17 @@ export function getCacheWithTTL<K extends string | number | symbol, V>(
   key: K,
 ): V | undefined {
   const expiry = cacheExpiry.get(String(key));
-  logger.debug({ key, expiry }, 'Checking cache entry');
+
   if (expiry && expiry < Date.now()) {
     cache.delete(key);
     cacheExpiry.delete(String(key));
-    logger.info({ key }, 'Evicted expired cache entry');
+    childLogger.info({ key }, 'Evicted expired cache entry');
     return undefined;
   }
 
   const cachedData = cache.get(key);
   if (!cachedData || !isCachedData(cachedData)) {
-    logger.warn({ key }, 'Cache contains invalid data');
+    childLogger.warn({ key }, 'Cache contains invalid data');
     return undefined;
   }
 

@@ -14,6 +14,10 @@
 import type { Level } from 'pino';
 import { logger } from './logger';
 
+const childLogger = logger.child({
+  name: 'catchError',
+});
+
 export const loggerMessages = {
   success: 'Promise resolved successfully',
   unknown: 'Error occurred (no specific error types to catch)',
@@ -45,7 +49,7 @@ export const catchError = async <T, E extends new (message?: string) => Error>(
 ): ReturnCatchErrorType<T> => {
   try {
     const data = await promise;
-    logger.info(loggerMessages.success, { data });
+    childLogger.info(loggerMessages.success, { data });
     return [undefined, data] as [undefined, T];
   } catch (error) {
     if (!errorsToCatch) {

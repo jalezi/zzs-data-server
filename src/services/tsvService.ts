@@ -1,5 +1,5 @@
 import { dataFiles } from '../database/config';
-import { parseCompressedFile } from '../utils/fileHelper';
+import { parseFile } from '../utils/fileHelper';
 
 /**
  * Retrieves and parses data from a specified file.
@@ -9,8 +9,13 @@ import { parseCompressedFile } from '../utils/fileHelper';
  * @returns {Promise<T>} - A promise that resolves to the parsed data of type T.
  * @throws {Error} - Throws an error if the file with the specified ID is not found.
  */
-export const getFileData = async <T>(fileId: string) => {
+export const getFileData = async <T>(fileId: string, isCompressed = false) => {
   const fileConfig = dataFiles.find((file) => file.id === fileId);
   if (!fileConfig) throw new Error('File not found');
-  return await parseCompressedFile<T>(fileConfig.path, fileConfig.format);
+  return await parseFile<T>(
+    fileConfig.path,
+    fileConfig.format,
+    fileConfig.schema,
+    isCompressed,
+  );
 };

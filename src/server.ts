@@ -8,6 +8,8 @@ import { globalRateLimiter } from './middleware/rateLimiter';
 import { apiVersioningRouter, catchAllRoute, healthcheckRoute } from './routes';
 import { httpLogger, logger } from './utils/logger';
 
+const childLogger = logger.child({ name: 'server' });
+
 const app = express();
 const PORT = env.PORT || 3000;
 
@@ -34,6 +36,6 @@ app.use(errorHandler);
 
 if (require.main === module) {
   app.listen(PORT, () => {
-    logger.info(`Server running on http://localhost:${PORT}`);
+    childLogger.info(`Server running on http://localhost:${PORT}`);
   });
 }

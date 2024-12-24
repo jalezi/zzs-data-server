@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { logger } from '../utils/logger';
 
+const childLogger = logger.child({ name: 'env' });
+
 const envSchema = z.object({
   PORT: z.string().default('3000'),
   API_KEYS: z.string().default('example-key-1,example-key-2'),
@@ -17,19 +19,25 @@ const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>;
 
-logger.info('Validating environment variables');
+childLogger.info('Validating environment variables');
 try {
   envSchema.parse(process.env);
-  logger.info('Environment variables are valid');
+  childLogger.info('Environment variables are valid');
 } catch (error) {
   if (error instanceof z.ZodError) {
     const formattedErrors = error.errors.map((err) => ({
       path: err.path.join('.'),
       message: err.message,
     }));
-    logger.error({ issues: formattedErrors }, 'Invalid environment variables');
+    childLogger.error(
+      { issues: formattedErrors },
+      'Invalid environment variables',
+    );
   } else {
-    logger.error({ error }, 'Unexpected error during environment validation');
+    childLogger.error(
+      { error },
+      'Unexpected error during environment validation',
+    );
   }
   process.exit(1);
 }
