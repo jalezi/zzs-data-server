@@ -1,5 +1,5 @@
 import { logger } from '../../../utils/logger';
-import type { CachedData } from './schemas/doctorRoutes';
+import type { CachedData, Institution } from './schemas/doctorRoutes';
 
 // Cache Expiry with Typed Key Handling
 const cacheExpiry = new Map<string, number>();
@@ -52,4 +52,22 @@ export function getCacheWithTTL<K extends string | number | symbol, V>(
   }
 
   return cachedData;
+}
+
+let cachedInstitutionsMap: Map<string, Institution> | null = null;
+let cachedInstitutionsTs: string | null = null;
+
+export function getInstitutionsMap(
+  institutions: Institution[],
+  institutionsTs: string,
+): Map<string, Institution> {
+  if (cachedInstitutionsMap && cachedInstitutionsTs === institutionsTs) {
+    return cachedInstitutionsMap;
+  }
+
+  cachedInstitutionsMap = new Map(
+    institutions.map((inst) => [inst.id_inst, inst]),
+  );
+  cachedInstitutionsTs = institutionsTs;
+  return cachedInstitutionsMap;
 }

@@ -11,9 +11,11 @@ import { fetchTextFile } from '../../utils/fetchTextFile';
 import { logger } from '../../utils/logger';
 import {
   getCacheWithTTL,
+  getInstitutionsMap,
   isCachedData,
   setCacheWithTTL,
 } from './helpers/cacheUtils';
+import { sendErrorResponse } from './helpers/errorUtils';
 import { fetchAndParseWithCache } from './helpers/fetchHelpers';
 import {
   type CachedData,
@@ -74,19 +76,10 @@ router.get('/', async (_req: Request, res: Response) => {
   const [timestampError, ts] = await fetchTimestamps();
   if (timestampError || !ts?.doctorsTs || !ts?.institutionsTs) {
     logger.error({ error: timestampError }, 'Failed to fetch timestamps');
-
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch timestamps',
-      timestamps: ts || {},
-      mergeData: [],
-      meta: {
-        cacheHit: false,
-        doctorsCount: 0,
-        institutionsCount: 0,
-        mergedCount: 0,
-        executionTime: calculateExecutionTime(startTime),
-      },
+    sendErrorResponse(res, 500, 'Failed to fetch timestamps', {
+      timestamps: ts,
+      cacheHit: false,
+      executionTime: calculateExecutionTime(startTime),
     });
     return;
   }
@@ -146,25 +139,15 @@ router.get('/', async (_req: Request, res: Response) => {
       'Failed to fetch or parse doctors or institutions',
     );
 
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch or parse data',
+    sendErrorResponse(res, 500, 'Failed to fetch or parse data', {
       timestamps: ts,
-      mergeData: [],
-      meta: {
-        cacheHit: false,
-        doctorsCount: doctors?.length || 0,
-        institutionsCount: institutions?.length || 0,
-        mergedCount: 0,
-        executionTime: calculateExecutionTime(startTime),
-      },
+      cacheHit: false,
+      executionTime: calculateExecutionTime(startTime),
     });
     return;
   }
 
-  const institutionsMap = new Map(
-    institutions.map((inst) => [inst.id_inst, inst]),
-  );
+  const institutionsMap = getInstitutionsMap(institutions, ts.institutionsTs);
 
   const mergedData = doctors.map((doctor) => ({
     ...doctor,
