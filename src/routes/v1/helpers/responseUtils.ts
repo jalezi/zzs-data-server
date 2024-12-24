@@ -20,7 +20,40 @@ export function sendSuccessResponse<T>(
 ) {
   res.json({
     success: true,
-    ...data,
     meta,
+    ...data,
   });
+}
+
+function calculateExecutionTime(startTime: number): string {
+  return `${Date.now() - startTime}ms`;
+}
+
+export function sendError(
+  res: Response,
+  status: number,
+  message: string,
+  meta: Record<string, unknown>,
+  startTime: number,
+) {
+  sendErrorResponse(res, status, message, {
+    ...meta,
+    executionTime: calculateExecutionTime(startTime),
+  });
+}
+
+export function sendSuccess<T>(
+  res: Response,
+  data: T,
+  meta: Record<string, unknown>,
+  startTime: number,
+) {
+  sendSuccessResponse(
+    res,
+    { data },
+    {
+      ...meta,
+      executionTime: calculateExecutionTime(startTime),
+    },
+  );
 }

@@ -12,10 +12,7 @@ import {
   fetchTimestamps,
 } from './helpers/fetchHelpers';
 import { mergeDoctorsAndInstitutions } from './helpers/mergeHelper';
-import {
-  sendErrorResponse,
-  sendSuccessResponse,
-} from './helpers/responseUtils';
+import { sendError, sendSuccess } from './helpers/responseUtils';
 import {
   type CachedData,
   type Doctor,
@@ -45,11 +42,13 @@ router.get('/', async (_req: Request, res: Response) => {
   const [timestampError, ts] = await fetchTimestamps();
   if (timestampError || !ts?.doctorsTs || !ts?.institutionsTs) {
     childLogger.error({ error: timestampError }, 'Failed to fetch timestamps');
-    sendErrorResponse(res, 500, 'Failed to fetch timestamps', {
-      timestamps: ts,
-      cacheHit: false,
-      executionTime: calculateExecutionTime(startTime),
-    });
+    sendError(
+      res,
+      500,
+      'Failed to fetch timestamps',
+      { timestamps: ts },
+      startTime,
+    );
     return;
   }
 
@@ -74,15 +73,11 @@ router.get('/', async (_req: Request, res: Response) => {
         },
         'Serving merged data from cache',
       );
-
-      sendSuccessResponse(
+      sendSuccess(
         res,
-        { data: cachedData.data },
-        {
-          ...cachedData.meta,
-          cacheHit: true, // Override cacheHit to true
-          executionTime: calculateExecutionTime(startTime),
-        },
+        cachedData.data,
+        { ...cachedData.meta, cacheHit: true },
+        startTime,
       );
       return;
     }
@@ -112,12 +107,16 @@ router.get('/', async (_req: Request, res: Response) => {
       },
       'Failed to fetch or parse doctors or institutions',
     );
-
-    sendErrorResponse(res, 500, 'Failed to fetch or parse data', {
-      timestamps: ts,
-      cacheHit: false,
-      executionTime: calculateExecutionTime(startTime),
-    });
+    sendError(
+      res,
+      500,
+      'Failed to fetch or parse data',
+      {
+        timestamps: ts,
+        cacheHit: false,
+      },
+      startTime,
+    );
     return;
   }
 
@@ -144,14 +143,11 @@ router.get('/', async (_req: Request, res: Response) => {
   );
   setCacheWithTTL(mergedDataCache, cacheKey, responseData);
 
-  sendSuccessResponse(
+  sendSuccess(
     res,
-    { data: mergedData },
-    {
-      ...responseData.meta,
-      cacheHit: false,
-      executionTime: calculateExecutionTime(startTime),
-    },
+    responseData.data,
+    { ...responseData.meta, cacheHit: false },
+    startTime,
   );
 });
 
