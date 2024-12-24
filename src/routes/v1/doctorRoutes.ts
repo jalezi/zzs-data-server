@@ -14,9 +14,12 @@ import {
   isCachedData,
   setCacheWithTTL,
 } from './helpers/cacheUtils';
-import { sendErrorResponse } from './helpers/errorUtils';
 import { fetchAndParseWithCache } from './helpers/fetchHelpers';
 import { mergeDoctorsAndInstitutions } from './helpers/mergeHelper';
+import {
+  sendErrorResponse,
+  sendSuccessResponse,
+} from './helpers/responseUtils';
 import {
   type CachedData,
   type Doctor,
@@ -86,6 +89,7 @@ router.get('/', async (_req: Request, res: Response) => {
 
   const cacheKey = `${ts.doctorsTs}-${ts.institutionsTs}`;
   const cachedData = getCacheWithTTL(mergedDataCache, cacheKey);
+  logger.debug({ cacheKey, cachedData: !!cachedData }, 'Cached data');
   if (cachedData) {
     if (!isCachedData(cachedData)) {
       logger.warn({ cacheKey }, 'Invalid cached data format, ignoring cache');
@@ -102,14 +106,15 @@ router.get('/', async (_req: Request, res: Response) => {
         'Serving merged data from cache',
       );
 
-      res.json({
-        success: true,
-        ...cachedData,
-        meta: {
+      sendSuccessResponse(
+        res,
+        { data: cachedData.data },
+        {
           ...cachedData.meta,
+          cacheHit: true, // Override cacheHit to true
           executionTime: calculateExecutionTime(startTime),
         },
-      });
+      );
       return;
     }
   }
@@ -154,9 +159,9 @@ router.get('/', async (_req: Request, res: Response) => {
   );
 
   const responseData: CachedData = {
-    timestamps: ts,
     data: mergedData,
     meta: {
+      timestamps: ts,
       cacheHit: false,
       doctorsCount: doctors.length,
       institutionsCount: institutions.length,
@@ -165,20 +170,17 @@ router.get('/', async (_req: Request, res: Response) => {
     },
   };
 
-  logger.info(
-    {
-      cacheKey,
-      timestamps: ts,
-      doctorsCount: doctors.length,
-      institutionsCount: institutions.length,
-      mergedCount: mergedData.length,
-      executionTime: calculateExecutionTime(startTime),
-    },
-    'Successfully merged and cached new data',
-  );
+  logger.info(responseData.meta, 'Successfully merged and cached new data');
   setCacheWithTTL(mergedDataCache, cacheKey, responseData);
 
-  res.json({ success: true, ...responseData });
+  sendSuccessResponse(
+    res,
+    { data: mergedData },
+    {
+      ...responseData.meta,
+      executionTime: calculateExecutionTime(startTime),
+    },
+  );
 });
 
 export default router;

@@ -58,10 +58,10 @@ export type Meta = {
   institutionsCount: number;
   mergedCount: number;
   executionTime: string;
+  timestamps: Timestamps;
 };
 
 export type CachedData = {
-  timestamps: Timestamps;
   meta: Meta;
   data: MergeData[];
 };

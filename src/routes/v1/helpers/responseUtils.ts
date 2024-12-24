@@ -12,3 +12,15 @@ export function sendErrorResponse(
     ...meta,
   });
 }
+
+export function sendSuccessResponse<T>(
+  res: Response,
+  data: T,
+  meta?: Record<string, unknown>,
+) {
+  res.json({
+    success: true,
+    ...data,
+    meta,
+  });
+}

@@ -27,7 +27,6 @@ export function isCachedData(data: unknown): data is CachedData {
   return (
     typeof data === 'object' &&
     data !== null &&
-    'timestamps' in data &&
     'meta' in data &&
     'data' in data
   );
@@ -38,6 +37,7 @@ export function getCacheWithTTL<K extends string | number | symbol, V>(
   key: K,
 ): V | undefined {
   const expiry = cacheExpiry.get(String(key));
+  logger.debug({ key, expiry }, 'Checking cache entry');
   if (expiry && expiry < Date.now()) {
     cache.delete(key);
     cacheExpiry.delete(String(key));
