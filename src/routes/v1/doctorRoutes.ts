@@ -16,8 +16,8 @@ import { mergeDoctorsAndInstitutions } from './helpers/mergeHelper';
 import { sendError, sendSuccess } from './helpers/responseUtils';
 import {
   type CachedData,
-  type Doctor,
-  type Institution,
+  type DoctorRawOutput,
+  type InstitutionRawOutput,
   doctorsRawSchema,
   institutionsRawSchema,
 } from './helpers/schemas/doctorRoutes';
@@ -29,8 +29,8 @@ const router = Router();
 
 // Caches
 const mergedDataCache = new Map<string, CachedData>();
-const doctorsCache = new Map<string, Doctor[]>();
-const institutionsCache = new Map<string, Institution[]>();
+const doctorsCache = new Map<string, DoctorRawOutput[]>();
+const institutionsCache = new Map<string, InstitutionRawOutput[]>();
 
 // Main Route
 router.get('/', async (_req: Request, res: Response) => {

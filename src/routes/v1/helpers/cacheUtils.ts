@@ -1,5 +1,10 @@
 import { logger } from '../../../utils/logger';
-import type { CachedData, Institution } from './schemas/doctorRoutes';
+import {
+  type CachedData,
+  type InstitutionRawInput,
+  type InstitutionRawOutput,
+  institutionsRawSchema,
+} from './schemas/doctorRoutes';
 
 const childLogger = logger.child({ name: 'cacheUtils' });
 
@@ -59,19 +64,22 @@ export function getCacheWithTTL<K extends string | number | symbol, V>(
   return cachedData;
 }
 
-let cachedInstitutionsMap: Map<string, Institution> | null = null;
+let cachedInstitutionsMap: Map<string, InstitutionRawOutput> | null = null;
 let cachedInstitutionsTs: number | null = null;
 
 export function getInstitutionsMap(
-  institutions: Institution[],
+  institutions: InstitutionRawInput[],
   institutionsTs: number,
-): Map<string, Institution> {
+): Map<string, InstitutionRawOutput> {
   if (cachedInstitutionsMap && cachedInstitutionsTs === institutionsTs) {
     return cachedInstitutionsMap;
   }
 
   cachedInstitutionsMap = new Map(
-    institutions.map((inst) => [inst.id_inst, inst]),
+    institutions.map((inst) => [
+      inst.id_inst,
+      institutionsRawSchema.parse(inst),
+    ]),
   );
   cachedInstitutionsTs = institutionsTs;
   return cachedInstitutionsMap;
