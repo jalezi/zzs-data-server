@@ -105,7 +105,7 @@ export const parseRawContent = async <T>(
   content: string,
   format: keyof typeof DELIMITERS,
   zodSchema: ZodType<T>,
-): ReturnCatchErrorType<ParseResult<T>> => {
+) => {
   const promise = new Promise<ParseResult<T>>((resolve, reject) => {
     const validRows: T[] = [];
     let totalRows = 0;

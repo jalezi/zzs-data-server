@@ -2,7 +2,7 @@ import { logger } from './logger';
 
 import { parse } from 'csv-parse';
 import type { Options as CsvParseOptions } from 'csv-parse';
-import type { ReturnCatchErrorType } from './catchError';
+import type { ReturnType } from './types';
 
 const childLogger = logger.child({ name: 'helpers' });
 
@@ -35,7 +35,7 @@ export const streamHandler = <T = unknown>(
 export const handlePromise = async <T>(
   promise: Promise<T>,
   loggerContext?: Record<string, unknown>,
-): Promise<ReturnCatchErrorType<T>> => {
+): Promise<ReturnType<T>> => {
   try {
     const result = await promise;
     return [undefined, result];
@@ -49,3 +49,11 @@ export const handlePromise = async <T>(
 export function calculateExecutionTime(startTime: number): string {
   return `${Date.now() - startTime}ms`;
 }
+
+export const isError = (value: unknown): value is Error =>
+  value instanceof Error;
+
+export const isNumber = (value: unknown): value is number =>
+  typeof value === 'number';
+
+export const createChildLogger = (name: string) => logger.child({ name });

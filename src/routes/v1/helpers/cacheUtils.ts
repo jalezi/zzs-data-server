@@ -60,11 +60,11 @@ export function getCacheWithTTL<K extends string | number | symbol, V>(
 }
 
 let cachedInstitutionsMap: Map<string, Institution> | null = null;
-let cachedInstitutionsTs: string | null = null;
+let cachedInstitutionsTs: number | null = null;
 
 export function getInstitutionsMap(
   institutions: Institution[],
-  institutionsTs: string,
+  institutionsTs: number,
 ): Map<string, Institution> {
   if (cachedInstitutionsMap && cachedInstitutionsTs === institutionsTs) {
     return cachedInstitutionsMap;

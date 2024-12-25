@@ -43,13 +43,13 @@ export const institutionsRawSchema = z.object({
 export type Doctor = z.infer<typeof doctorsRawSchema>;
 export type Institution = z.infer<typeof institutionsRawSchema>;
 
-export type MergeData = z.infer<typeof doctorsRawSchema> & {
-  institution: z.infer<typeof institutionsRawSchema> | null;
+export type MergeData = Doctor & {
+  institution: Institution | null;
 };
 
 export type Timestamps = {
-  doctorsTs: string | null;
-  institutionsTs: string | null;
+  doctorsTs: number;
+  institutionsTs: number;
 };
 
 export type Meta = {

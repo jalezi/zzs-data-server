@@ -4,7 +4,7 @@ import type { Doctor, Institution, MergeData } from './schemas/doctorRoutes';
 export function mergeDoctorsAndInstitutions(
   doctors: Doctor[],
   institutions: Institution[],
-  institutionsTs: string,
+  institutionsTs: number,
 ): MergeData[] {
   const institutionsMap = getInstitutionsMap(institutions, institutionsTs);
   return doctors.map((doctor) => ({
