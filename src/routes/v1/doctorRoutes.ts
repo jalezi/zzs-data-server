@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { DOCTORS, INSTITUTIONS } from '../../constants/doctors';
 import { calculateExecutionTime } from '../../utils/helpers';
 import { logger } from '../../utils/logger';
@@ -13,7 +13,7 @@ import {
   fetchTimestamps,
 } from './helpers/fetchHelpers';
 import { mergeDoctorsAndInstitutions } from './helpers/mergeHelper';
-import { sendError, sendSuccess } from './helpers/responseUtils';
+import { sendSuccess } from './helpers/responseUtils';
 import {
   type CachedData,
   type DoctorRawOutput,
@@ -33,113 +33,101 @@ const doctorsCache = new Map<string, DoctorRawOutput[]>();
 const institutionsCache = new Map<string, InstitutionRawOutput[]>();
 
 // Main Route
-router.get('/', async (_req: Request, res: Response) => {
-  const startTime = Date.now();
+router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const startTime = Date.now();
 
-  const [timestampError, ts] = await fetchTimestamps();
-  if (timestampError || !ts?.doctorsTs || !ts?.institutionsTs) {
-    childLogger.error({ error: timestampError }, 'Failed to fetch timestamps');
-    sendError(
-      res,
-      500,
-      'Failed to fetch timestamps',
-      { timestamps: ts },
-      startTime,
-    );
-    return;
-  }
-
-  const cacheKey = `${ts.doctorsTs}-${ts.institutionsTs}`;
-  const cachedData = getCacheWithTTL(mergedDataCache, cacheKey);
-  childLogger.debug(
-    { cacheKey, cachedData: !!cachedData },
-    'Cached data exists',
-  );
-  if (cachedData) {
-    if (!isCachedData(cachedData)) {
-      childLogger.warn(
-        { cacheKey },
-        'Invalid cached data format, ignoring cache',
+    const [timestampError, ts] = await fetchTimestamps();
+    if (timestampError || !ts?.doctorsTs || !ts?.institutionsTs) {
+      childLogger.error(
+        { error: timestampError },
+        'Failed to fetch timestamps',
       );
-      mergedDataCache.delete(cacheKey);
-    } else {
-      childLogger.info({ cacheKey }, 'Serving merged data from cache');
-      sendSuccess(
-        res,
-        cachedData.data,
-        { ...cachedData.meta, cacheHit: true },
-        startTime,
-      );
-      return;
+      throw new Error('Failed to fetch timestamps', {
+        cause: timestampError,
+      });
     }
-  }
 
-  const [doctorsError, doctors] = await fetchAndParseWithCache(
-    DOCTORS.href,
-    doctorsRawSchema,
-    doctorsCache,
-    ts.doctorsTs,
-  );
-
-  const [institutionsError, institutions] = await fetchAndParseWithCache(
-    INSTITUTIONS.href,
-    institutionsRawSchema,
-    institutionsCache,
-    ts.institutionsTs,
-  );
-
-  if (doctorsError || institutionsError || !doctors || !institutions) {
-    childLogger.error(
-      {
-        doctorsError,
-        institutionsError,
-        doctorsUrl: DOCTORS.href,
-        institutionsUrl: INSTITUTIONS.href,
-      },
-      'Failed to fetch or parse doctors or institutions',
+    const cacheKey = `${ts.doctorsTs}-${ts.institutionsTs}`;
+    const cachedData = getCacheWithTTL(mergedDataCache, cacheKey);
+    childLogger.debug(
+      { cacheKey, cachedData: !!cachedData },
+      'Cached data exists',
     );
-    sendError(
-      res,
-      500,
-      'Failed to fetch or parse data',
-      {
+    if (cachedData) {
+      if (!isCachedData(cachedData)) {
+        childLogger.warn(
+          { cacheKey },
+          'Invalid cached data format, ignoring cache',
+        );
+        mergedDataCache.delete(cacheKey);
+      } else {
+        childLogger.info({ cacheKey }, 'Serving merged data from cache');
+        sendSuccess(
+          res,
+          cachedData.data,
+          { ...cachedData.meta, cacheHit: true },
+          startTime,
+        );
+        return;
+      }
+    }
+
+    const [doctorsError, doctors] = await fetchAndParseWithCache(
+      DOCTORS.href,
+      doctorsRawSchema,
+      doctorsCache,
+      ts.doctorsTs,
+    );
+
+    const [institutionsError, institutions] = await fetchAndParseWithCache(
+      INSTITUTIONS.href,
+      institutionsRawSchema,
+      institutionsCache,
+      ts.institutionsTs,
+    );
+
+    if (doctorsError || institutionsError || !doctors || !institutions) {
+      childLogger.error(
+        {
+          doctorsError,
+          institutionsError,
+          doctorsUrl: DOCTORS.href,
+          institutionsUrl: INSTITUTIONS.href,
+        },
+        'Failed to fetch or parse doctors or institutions',
+      );
+      throw new Error('Failed to fetch or parse data', {
+        cause: { doctorsError, institutionsError, doctors, institutions },
+      });
+    }
+
+    const mergedData = mergeDoctorsAndInstitutions(
+      doctors,
+      institutions,
+      ts.institutionsTs,
+    );
+
+    const responseData: CachedData = {
+      data: mergedData,
+      meta: {
         timestamps: ts,
-        cacheHit: false,
+        doctorsCount: doctors.length,
+        institutionsCount: institutions.length,
+        mergedCount: mergedData.length,
+        executionTime: calculateExecutionTime(startTime),
       },
-      startTime,
+    };
+
+    setCacheWithTTL(mergedDataCache, cacheKey, responseData);
+    childLogger.info(
+      responseData.meta,
+      'Successfully merged and cached new data',
     );
-    return;
+    sendSuccess(res, responseData.data, responseData.meta, startTime);
+  } catch (err) {
+    next(err);
   }
-
-  const mergedData = mergeDoctorsAndInstitutions(
-    doctors,
-    institutions,
-    ts.institutionsTs,
-  );
-
-  const responseData: CachedData = {
-    data: mergedData,
-    meta: {
-      timestamps: ts,
-      doctorsCount: doctors.length,
-      institutionsCount: institutions.length,
-      mergedCount: mergedData.length,
-      executionTime: calculateExecutionTime(startTime),
-    },
-  };
-
-  childLogger.info(
-    responseData.meta,
-    'Successfully merged and cached new data',
-  );
-  setCacheWithTTL(mergedDataCache, cacheKey, responseData);
-
-  sendSuccess(
-    res,
-    responseData.data,
-    { ...responseData.meta, cacheHit: false },
-    startTime,
-  );
 });
 
 export default router;

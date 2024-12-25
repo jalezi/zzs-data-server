@@ -1,36 +1,37 @@
-import { type Request, type Response, Router } from 'express';
+import { Router } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { dataFiles } from '../../database/config';
 import { parseFile } from '../../utils/fileHelper';
 
 const router = Router();
 
-router.get('/:fileId', async (req: Request, res: Response) => {
-  const { fileId } = req.params;
-  const fileConfig = dataFiles.find((file) => file.id === fileId);
+router.get(
+  '/:fileId',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { fileId } = req.params;
+      const fileConfig = dataFiles.find((file) => file.id === fileId);
 
-  if (!fileConfig) {
-    res.status(404).json({ error: 'File not found' });
-    return;
-  }
+      if (!fileConfig) {
+        throw new Error('File not found');
+      }
 
-  try {
-    const [error, result] = await parseFile(
-      fileConfig.path,
-      fileConfig.format,
-      fileConfig.schema,
-      true,
-    );
+      const [error, result] = await parseFile(
+        fileConfig.path,
+        fileConfig.format,
+        fileConfig.schema,
+        true,
+      );
 
-    if (error) {
-      throw error;
+      if (error) {
+        throw error;
+      }
+
+      res.json({ success: true, ...result });
+    } catch (err) {
+      next(err);
     }
-
-    res.json({ success: true, ...result });
-  } catch (err) {
-    res
-      .status(500)
-      .json({ error: 'Failed to parse file', details: (err as Error).message });
-  }
-});
+  },
+);
 
 export default router;
