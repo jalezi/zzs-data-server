@@ -15,7 +15,7 @@ const mockedConfig = {
 
 // Mock parseCompressedFile utility
 const mockedFileHelper = {
-  parseCompressedFile: (path: string, _format: string) => {
+  parseFile: (path: string, _format: string) => {
     if (path.includes('file1'))
       return [undefined, { data: [{ id: 1, name: 'Test Data 1' }] }];
     if (path.includes('file2'))
