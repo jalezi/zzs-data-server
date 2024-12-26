@@ -36,75 +36,48 @@ const institutionsCache = new Map<string, InstitutionRawOutput[]>();
 router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const startTime = Date.now();
-
-    const [timestampError, ts] = await fetchTimestamps();
-    if (timestampError || !ts?.doctorsTs || !ts?.institutionsTs) {
-      childLogger.error(
-        { error: timestampError },
-        'Failed to fetch timestamps',
-      );
-      throw new Error('Failed to fetch timestamps', {
-        cause: timestampError,
-      });
-    }
+    const ts = await fetchTimestamps();
 
     const cacheKey = `${ts.doctorsTs}-${ts.institutionsTs}`;
     const cachedData = getCacheWithTTL(mergedDataCache, cacheKey);
-    childLogger.debug(
-      { cacheKey, cachedData: !!cachedData },
-      'Cached data exists',
-    );
-    if (cachedData) {
-      if (!isCachedData(cachedData)) {
-        childLogger.warn(
-          { cacheKey },
-          'Invalid cached data format, ignoring cache',
-        );
-        mergedDataCache.delete(cacheKey);
-      } else {
-        childLogger.info({ cacheKey }, 'Serving merged data from cache');
-        sendSuccess(
-          res,
-          cachedData.data,
-          { ...cachedData.meta, cacheHit: true },
-          startTime,
-        );
-        return;
-      }
-    }
 
-    const [doctorsError, doctors] = await fetchAndParseWithCache(
-      DOCTORS.href,
-      doctorsRawSchema,
-      doctorsCache,
-      ts.doctorsTs,
-    );
-
-    const [institutionsError, institutions] = await fetchAndParseWithCache(
-      INSTITUTIONS.href,
-      institutionsRawSchema,
-      institutionsCache,
-      ts.institutionsTs,
-    );
-
-    if (doctorsError || institutionsError || !doctors || !institutions) {
-      childLogger.error(
-        {
-          doctorsError,
-          institutionsError,
-          doctorsUrl: DOCTORS.href,
-          institutionsUrl: INSTITUTIONS.href,
-        },
-        'Failed to fetch or parse doctors or institutions',
+    if (cachedData && isCachedData(cachedData)) {
+      childLogger.info({ cacheKey }, 'Serving merged data from cache');
+      sendSuccess(
+        res,
+        cachedData.data,
+        { ...cachedData.meta, cacheHit: true },
+        startTime,
       );
-      throw new Error('Failed to fetch or parse data', {
-        cause: { doctorsError, institutionsError, doctors, institutions },
-      });
+      return;
     }
+
+    if (cachedData && !isCachedData(cachedData)) {
+      childLogger.warn(
+        { cacheKey },
+        'Invalid cached data format, ignoring cache, deleting entry',
+      );
+      mergedDataCache.delete(cacheKey);
+    }
+
+    const [doctors, institutinons] = await Promise.all([
+      fetchAndParseWithCache(
+        DOCTORS.href,
+        doctorsRawSchema,
+        doctorsCache,
+        ts.doctorsTs,
+      ),
+      fetchAndParseWithCache(
+        INSTITUTIONS.href,
+        institutionsRawSchema,
+        institutionsCache,
+        ts.institutionsTs,
+      ),
+    ]);
 
     const mergedData = mergeDoctorsAndInstitutions(
       doctors,
-      institutions,
+      institutinons,
       ts.institutionsTs,
     );
 
@@ -113,7 +86,7 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
       meta: {
         timestamps: ts,
         doctorsCount: doctors.length,
-        institutionsCount: institutions.length,
+        institutionsCount: institutinons.length,
         mergedCount: mergedData.length,
         executionTime: calculateExecutionTime(startTime),
       },
@@ -126,6 +99,7 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
     );
     sendSuccess(res, responseData.data, responseData.meta, startTime);
   } catch (err) {
+    childLogger.error(err);
     next(err);
   }
 });
