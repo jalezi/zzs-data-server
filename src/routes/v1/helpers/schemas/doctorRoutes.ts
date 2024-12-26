@@ -73,6 +73,9 @@ export const doctorsMergedSchema = z
     };
 
     // doctors address overides institution address
+    const post = doctor.post ? doctor.post : institution.post;
+    const [postalCode, ...postalName] = post.split(' ');
+
     const address = {
       street: doctor.address ? doctor.address : institution.address,
       city: doctor.city ? doctor.city : institution.city,
@@ -82,7 +85,8 @@ export const doctorsMergedSchema = z
       municipalityPart: doctor.municipalityPart
         ? doctor.municipalityPart
         : institution.municipalityPart,
-      post: doctor.post ? doctor.post : institution.post,
+      postalCode,
+      postalName: postalName.join(' '),
     };
 
     const contact = {
@@ -93,24 +97,32 @@ export const doctorsMergedSchema = z
 
     return {
       id: generateDoctorId(doctor),
-      doctor: doctor.doctor,
-      institution: institution.name,
-      id_inst: doctor.id_inst,
+      fullName: doctor.doctor,
       type: doctor.type,
+      institution: {
+        id: institution.id_inst,
+        name: institution.name,
+        unit: institution.unit,
+        zzzsSt: institution.zzzsSt,
+      },
       data: {
         accepts: doctor.accepts_overide ?? doctor.accepts,
         availability: doctor.availability_overide ?? doctor.availability,
         load: doctor.load,
         note: doctor.note_overide,
-        date: doctor.date_overide,
-        loadStyle:
-          doctor.type.startsWith('den') || doctor.type.startsWith('gyn')
-            ? 'percentage'
-            : 'decimal',
       },
       location,
       address,
       contact,
+      meta: {
+        dateOverride: doctor.date_overide,
+        formatLoad:
+          doctor.type.startsWith('den') || doctor.type.startsWith('gyn')
+            ? 'percentage'
+            : 'decimal',
+        processedwAt: Date.now(),
+        version: '1.0',
+      },
     };
   });
 

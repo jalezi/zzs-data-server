@@ -57,3 +57,7 @@ export const isNumber = (value: unknown): value is number =>
   typeof value === 'number';
 
 export const createChildLogger = (name: string) => logger.child({ name });
+
+export const normalizeString = (value: string): string => {
+  return value.trim().toLowerCase().normalize('NFD').replace(/\p{M}/gu, ''); // Remove diacritics
+};
