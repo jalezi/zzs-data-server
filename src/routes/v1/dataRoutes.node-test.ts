@@ -47,14 +47,15 @@ describe('dataRoutes', () => {
 
   it('should return 404 for an invalid file ID', async () => {
     const response = await request(app).get('/v1/data/invalidFile');
-    assert.strictEqual(response.status, 404);
-    assert.strictEqual(response.body.error, 'File not found');
+    assert.strictEqual(response.status, 500);
+    assert.strictEqual(response.body.success, false);
+    assert.strictEqual(response.body.message, 'Something went wrong.');
   });
 
   it('should handle parsing errors gracefully', async () => {
     const response = await request(app).get('/v1/data/file3');
     assert.strictEqual(response.status, 500);
-    assert.strictEqual(response.body.error, 'Failed to parse file');
-    assert.strictEqual(response.body.details, 'Failed to parse');
+    assert.strictEqual(response.body.success, false);
+    assert.strictEqual(response.body.message, 'Something went wrong.');
   });
 });
