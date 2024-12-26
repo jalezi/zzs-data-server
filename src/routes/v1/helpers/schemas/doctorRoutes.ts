@@ -1,4 +1,11 @@
+import crypto from 'node:crypto';
 import { z } from 'zod';
+
+function generateDoctorId(val: DoctorRawInput) {
+  const { type, id_inst, doctor } = val; // Extract properties in order
+  const dataString = `${type}|${id_inst}|${doctor}`; // Concatenate with delimiter
+  return crypto.createHash('sha256').update(dataString).digest('hex'); // Generate hash
+}
 
 export const overideRawSchema = z.object({
   accepts_overide: z.string().nullish().default(null),
@@ -85,6 +92,7 @@ export const doctorsMergedSchema = z
     };
 
     return {
+      id: generateDoctorId(doctor),
       doctor: doctor.doctor,
       institution: institution.name,
       id_inst: doctor.id_inst,
