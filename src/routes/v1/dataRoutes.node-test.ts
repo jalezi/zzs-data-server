@@ -15,13 +15,18 @@ const mockedConfig = {
 
 // Mock parseCompressedFile utility
 const mockedFileHelper = {
-  parseFile: (path: string, _format: string) => {
+  parseFile: async (
+    path: string,
+    _format: string,
+    _zodSchema: unknown,
+    _isCompressed: boolean,
+  ) => {
     if (path.includes('file1'))
       return [undefined, { data: [{ id: 1, name: 'Test Data 1' }] }];
     if (path.includes('file2'))
       return [undefined, { data: [{ id: 2, name: 'Test Data 2' }] }];
-    if (path.includes('file3')) throw new Error('Failed to parse');
-    throw new Error('Failed to parse');
+    if (path.includes('file3')) return [new Error('Failed to parse')];
+    return [new Error('Failed to parse')];
   },
 };
 
@@ -45,17 +50,17 @@ describe('dataRoutes', () => {
     ]);
   });
 
-  it('should return 404 for an invalid file ID', async () => {
+  it('should return an error with message "File not found"', async () => {
     const response = await request(app).get('/v1/data/invalidFile');
-    assert.strictEqual(response.status, 500);
+    assert.strictEqual(response.status, 404);
     assert.strictEqual(response.body.success, false);
-    assert.strictEqual(response.body.message, 'Something went wrong.');
+    assert.strictEqual(response.body.message, 'File not found');
   });
 
   it('should handle parsing errors gracefully', async () => {
     const response = await request(app).get('/v1/data/file3');
     assert.strictEqual(response.status, 500);
     assert.strictEqual(response.body.success, false);
-    assert.strictEqual(response.body.message, 'Something went wrong.');
+    assert.strictEqual(response.body.message, 'Failed to parse');
   });
 });

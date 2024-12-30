@@ -2,6 +2,9 @@ import { Router } from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import { dataFiles } from '../../database/config';
 import { parseFile } from '../../utils/fileHelper';
+import { logger } from '../../utils/logger';
+
+const childLogger = logger.child({ name: 'dataRoutes' });
 
 const router = Router();
 
@@ -13,7 +16,8 @@ router.get(
       const fileConfig = dataFiles.find((file) => file.id === fileId);
 
       if (!fileConfig) {
-        throw new Error('File not found');
+        res.status(404).json({ success: false, message: 'File not found' });
+        return;
       }
 
       const [error, result] = await parseFile(
@@ -24,7 +28,9 @@ router.get(
       );
 
       if (error) {
-        throw error;
+        childLogger.error({ error, fileId }, 'Failed to parse file');
+        res.status(500).json({ success: false, message: 'Failed to parse' });
+        return;
       }
 
       res.json({ success: true, ...result });
