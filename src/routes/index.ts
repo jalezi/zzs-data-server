@@ -2,7 +2,7 @@ import { Router } from 'express';
 import v1Routes from './v1';
 
 export { default as catchAllRoute } from './catchAllRoute';
-export { default as healthcheckRoute } from './healthcheckRoute';
+export { default as healthcheckRouter } from './healthcheckRouter';
 
 const apiVersioningRouter = Router();
 

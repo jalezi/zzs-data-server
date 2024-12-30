@@ -5,7 +5,11 @@ import { env } from './env';
 import { apiKeyAuth } from './middleware/apiKeyAuth';
 import { errorHandler } from './middleware/errorHandler';
 import { globalRateLimiter } from './middleware/rateLimiter';
-import { apiVersioningRouter, catchAllRoute, healthcheckRoute } from './routes';
+import {
+  apiVersioningRouter,
+  catchAllRoute,
+  healthcheckRouter,
+} from './routes';
 import { httpLogger, logger } from './utils/logger';
 
 const childLogger = logger.child({ name: 'server' });
@@ -28,8 +32,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(globalRateLimiter);
-app.use(healthcheckRoute);
 app.use(apiKeyAuth);
+app.use('/healthcheck', healthcheckRouter);
 app.use('/api', apiVersioningRouter);
 app.use(catchAllRoute);
 app.use(errorHandler);
