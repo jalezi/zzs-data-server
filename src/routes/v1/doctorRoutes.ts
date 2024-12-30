@@ -166,9 +166,10 @@ function initializeFuse(data: MergeData[]): Fuse<MergeData> {
   const fuseOptions: IFuseOptions<MergeData> = {
     includeScore: true,
     includeMatches: true,
+    minMatchCharLength: 2,
     keys: [
-      { name: 'fullName', weight: 0.7 },
-      { name: 'institution.name', weight: 0.5 },
+      { name: 'fullName', weight: 1 },
+      { name: 'institution.name', weight: 0.7 },
       { name: 'institution.unit', weight: 0.3 },
       { name: 'address.street', weight: 0.5 },
       { name: 'address.city', weight: 0.5 },
