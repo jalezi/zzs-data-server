@@ -16,12 +16,12 @@ const childLogger = createChildLogger('fetchHelpers');
 export async function fetchAndParseWithCache<T>(
   url: string,
   schema: ZodSchema<T>,
-  cache: Map<string, T[]>,
-  timestamp: number,
+  cacheKey: string,
 ): Promise<T[]> {
-  const cachedData = getCacheWithTTL(cache, timestamp.toString());
+  const uniqueKey = `${cacheKey}-${url}`;
+  const cachedData = await getCacheWithTTL<T[]>(uniqueKey);
   if (cachedData) {
-    childLogger.info({ timestamp, url }, 'Serving data from cache');
+    childLogger.info({ uniqueKey, url }, 'Serving data from cache');
     return cachedData;
   }
 
@@ -48,7 +48,7 @@ export async function fetchAndParseWithCache<T>(
   }
 
   const { data } = parsedData;
-  setCacheWithTTL(cache, timestamp.toString(), data);
+  await setCacheWithTTL(uniqueKey, data);
 
   return data;
 }

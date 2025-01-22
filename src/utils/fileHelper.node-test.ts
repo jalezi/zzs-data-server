@@ -228,7 +228,6 @@ describe('fileHelper tests', () => {
         schemaWithHeader,
       );
 
-      console.log(error);
       assert.equal(error, undefined);
       assert.equal(result?.meta.totalRows, 3);
       assert.equal(result?.meta.validRows, 3);
@@ -287,8 +286,6 @@ describe('fileHelper tests', () => {
         'csv',
         schema,
       );
-
-      console.log(error);
 
       // Assertions
       assert.ok(error); // An error should be returned

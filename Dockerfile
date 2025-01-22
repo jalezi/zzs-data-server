@@ -1,19 +1,48 @@
-# Use a lightweight Node.js image
-FROM node:22-alpine
+# Build stage
+FROM node:20-alpine AS builder
 
-# Set the working directory
 WORKDIR /app
 
-# Copy package files and install dependencies
-COPY package*.json ./
-RUN npm install
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Copy source code and build
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source files
 COPY . .
-RUN npm run build
 
-# Expose the port your app runs on
+# Build application
+RUN pnpm build
+
+# Production stage
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# Copy built assets
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/pnpm-lock.yaml ./
+
+# Install production dependencies only
+RUN pnpm install --prod --frozen-lockfile
+
+# Create database directory
+RUN mkdir -p /app/database
+
+# Add healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD node dist/healthcheck.js
+
+# Run as non-root user
+USER node
+
 EXPOSE 3000
-
-# Command to run your app
-CMD ["node", "dist/server.js"]
+CMD ["node", "dist/index.js"]

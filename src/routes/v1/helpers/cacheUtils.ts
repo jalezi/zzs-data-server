@@ -1,3 +1,4 @@
+import redisClient from '../../../services/redisClient';
 import { logger } from '../../../utils/logger';
 import {
   type CachedData,
@@ -8,28 +9,15 @@ import {
 
 const childLogger = logger.child({ name: 'cacheUtils' });
 
-// Cache Expiry with Typed Key Handling
-const cacheExpiry = new Map<string, number>();
-const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes TTL
-const MAX_CACHE_SIZE = 100;
+const CACHE_TTL_SECONDS = 600; // 10 minutes TTL
 
-export function setCacheWithTTL<K extends string | number | symbol, V>(
-  cache: Map<K, V>,
-  key: K,
-  value: V,
-): void {
-  cache.set(key, value);
-  cacheExpiry.set(String(key), Date.now() + CACHE_TTL_MS);
-
-  // Enforce size limit
-  if (cache.size > MAX_CACHE_SIZE) {
-    const oldestKey = [...cache.keys()][0];
-    cache.delete(oldestKey);
-    cacheExpiry.delete(String(oldestKey));
-    childLogger.info(
-      { oldestKey },
-      'Evicted oldest cache entry due to size limit',
-    );
+export async function setCacheWithTTL<V>(key: string, value: V): Promise<void> {
+  try {
+    const valueString = JSON.stringify(value);
+    await redisClient.set(key, valueString, 'EX', CACHE_TTL_SECONDS);
+  } catch (error) {
+    childLogger.error({ key, error }, 'Failed to set cache in Redis');
+    throw error; // Propagate error
   }
 }
 
@@ -42,45 +30,39 @@ export function isCachedData(data: unknown): data is CachedData {
   );
 }
 
-export function getCacheWithTTL<K extends string | number | symbol, V>(
-  cache: Map<K, V>,
-  key: K,
-): V | undefined {
-  const expiry = cacheExpiry.get(String(key));
-
-  if (expiry && expiry < Date.now()) {
-    cache.delete(key);
-    cacheExpiry.delete(String(key));
-    childLogger.info({ key }, 'Evicted expired cache entry');
-    return undefined;
+export async function getCacheWithTTL<V>(key: string): Promise<V | undefined> {
+  try {
+    const cachedValue = await redisClient.get(key);
+    logger.debug({ key }, 'Got cache from Redis');
+    if (!cachedValue) {
+      return undefined;
+    }
+    return JSON.parse(cachedValue) as V;
+  } catch (error) {
+    childLogger.error({ key, error }, 'Failed to get cache from Redis');
+    throw error; // Propagate error
   }
-
-  const cachedData = cache.get(key);
-  if (!cachedData || !isCachedData(cachedData)) {
-    childLogger.warn({ key }, 'Cache contains invalid data');
-    return undefined;
-  }
-
-  return cachedData;
 }
 
-let cachedInstitutionsMap: Map<string, InstitutionRawOutput> | null = null;
-let cachedInstitutionsTs: number | null = null;
-
-export function getInstitutionsMap(
+export async function getInstitutionsMap(
   institutions: InstitutionRawInput[],
   institutionsTs: number,
-): Map<string, InstitutionRawOutput> {
-  if (cachedInstitutionsMap && cachedInstitutionsTs === institutionsTs) {
-    return cachedInstitutionsMap;
+): Promise<Map<string, InstitutionRawOutput>> {
+  const cacheKey = `institutions-map-${institutionsTs}`;
+  const cachedData =
+    await getCacheWithTTL<Map<string, InstitutionRawOutput>>(cacheKey);
+
+  if (cachedData && cachedData instanceof Map) {
+    return cachedData;
   }
 
-  cachedInstitutionsMap = new Map(
+  const institutionsMap = new Map(
     institutions.map((inst) => [
       inst.id_inst,
       institutionsRawSchema.parse(inst),
     ]),
   );
-  cachedInstitutionsTs = institutionsTs;
-  return cachedInstitutionsMap;
+
+  await setCacheWithTTL(cacheKey, institutionsMap);
+  return institutionsMap;
 }

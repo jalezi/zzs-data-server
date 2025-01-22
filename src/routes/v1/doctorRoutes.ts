@@ -24,9 +24,8 @@ import {
 } from './helpers/schemas/doctorRoutes';
 import type {
   CachedData,
-  DoctorRawOutput,
-  InstitutionRawOutput,
   MergeData,
+  Timestamps,
 } from './helpers/schemas/doctorRoutes';
 
 const childLogger = logger.child({
@@ -34,10 +33,8 @@ const childLogger = logger.child({
 });
 const router = Router();
 
-// Caches
-const mergedDataCache = new Map<string, CachedData>();
-const doctorsCache = new Map<string, DoctorRawOutput[]>();
-const institutionsCache = new Map<string, InstitutionRawOutput[]>();
+const mergedDataCacheKey = (ts: Timestamps): string =>
+  `merged-data-${ts.doctorsTs}-${ts.institutionsTs}`;
 
 // Main Route
 router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
@@ -45,8 +42,9 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
     const startTime = Date.now();
     const ts = await fetchTimestamps();
 
-    const cacheKey = `${ts.doctorsTs}-${ts.institutionsTs}`;
-    const cachedData = getCacheWithTTL(mergedDataCache, cacheKey);
+    const cacheKey = mergedDataCacheKey(ts);
+
+    const cachedData = await getCacheWithTTL<CachedData>(cacheKey);
 
     if (cachedData && isCachedData(cachedData)) {
       childLogger.info({ cacheKey }, 'Serving merged data from cache');
@@ -62,27 +60,24 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
     if (cachedData && !isCachedData(cachedData)) {
       childLogger.warn(
         { cacheKey },
-        'Invalid cached data format, ignoring cache, deleting entry',
+        'Invalid cached data format, ignoring cache',
       );
-      mergedDataCache.delete(cacheKey);
     }
 
     const [doctors, institutinons] = await Promise.all([
       fetchAndParseWithCache(
         DOCTORS.href,
         doctorsRawSchema,
-        doctorsCache,
-        ts.doctorsTs,
+        ts.doctorsTs.toString(),
       ),
       fetchAndParseWithCache(
         INSTITUTIONS.href,
         institutionsRawSchema,
-        institutionsCache,
-        ts.institutionsTs,
+        ts.institutionsTs.toString(),
       ),
     ]);
 
-    const mergedData = mergeDoctorsAndInstitutions(
+    const mergedData = await mergeDoctorsAndInstitutions(
       doctors,
       institutinons,
       ts.institutionsTs,
@@ -99,12 +94,17 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
       },
     };
 
-    setCacheWithTTL(mergedDataCache, cacheKey, responseData);
+    await setCacheWithTTL(cacheKey, responseData);
     childLogger.info(
       responseData.meta,
       'Successfully merged and cached new data',
     );
-    sendSuccess(res, responseData.data, responseData.meta, startTime);
+    sendSuccess(
+      res,
+      responseData.data,
+      { ...responseData.meta, cacheHit: false },
+      startTime,
+    );
   } catch (err) {
     childLogger.error(err);
     next(err);
@@ -186,11 +186,10 @@ function initializeFuse(data: MergeData[]): Fuse<MergeData> {
 
 async function fetchOrUseCache(
   baseUrl: string,
-  mergedDataCache: Map<string, CachedData>,
-): Promise<CachedData> {
+): Promise<CachedData & { meta: { cacheHit: boolean } }> {
   const ts = await fetchTimestamps();
-  const cacheKey = `${ts.doctorsTs}-${ts.institutionsTs}`;
-  let cachedData = getCacheWithTTL(mergedDataCache, cacheKey);
+  const cacheKey = mergedDataCacheKey(ts);
+  const cachedData = await getCacheWithTTL<CachedData>(cacheKey);
 
   if (!cachedData || !isCachedData(cachedData)) {
     childLogger.warn(
@@ -206,13 +205,13 @@ async function fetchOrUseCache(
     }
 
     const homeRouteData = await response.json();
-    cachedData = {
+    return {
       data: homeRouteData.data,
-      meta: homeRouteData.meta,
+      meta: { ...homeRouteData.meta, cacheHit: false },
     };
   }
 
-  return cachedData;
+  return Object.assign(cachedData, { meta: { cacheHit: true } });
 }
 
 router.get(
@@ -227,7 +226,7 @@ router.get(
       const host = req.get('host');
       const baseUrl = `${protocol}://${host}`;
 
-      const cachedData = await fetchOrUseCache(baseUrl, mergedDataCache);
+      const cachedData = await fetchOrUseCache(baseUrl);
 
       let filteredData = cachedData.data;
       filteredData = filteredData.filter((entry) => entry.type === type);
@@ -251,23 +250,31 @@ router.get(
       const fuse = initializeFuse(normalizedData);
       const results = fuse.search(normalizedQuery);
 
+      console.log(results);
+
       if (results.length === 0) {
         res.status(404).json({ error: `No results found for query '${q}'` });
         return;
       }
 
       const resultsData = results.map((result) => {
-        const { item, matches } = result;
+        const { item, matches, score } = result;
         const notNormalizedItem = filteredData.find(
           (entry) => entry.id === item.id,
         );
         return {
           item: notNormalizedItem,
           matches,
+          score,
         };
       });
 
-      sendSuccess(res, resultsData, { length: resultsData.length }, startTime);
+      sendSuccess(
+        res,
+        resultsData,
+        { length: resultsData.length, cacheHit: cachedData.meta.cacheHit },
+        startTime,
+      );
     } catch (err) {
       childLogger.error(err);
       next(err);

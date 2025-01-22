@@ -7,6 +7,7 @@ A Node.js server for handling and processing `.tsv.gz` and `.csv.gz` files, buil
 - **API Versioning**: Support for multiple API versions (`v1`, `v2`, etc.).
 - **Environment Validation**: Uses `zod` to validate and manage environment variables.
 - **Rate Limiting**: Protects the API from abuse using `express-rate-limit`.
+- **Redis Caching**: Implements efficient data caching with Redis.
 - **Logging**: High-performance logging with `pino` and `pino-http` for HTTP request/response logging.
 - **File Parsing**: Processes `.tsv.gz` and `.csv.gz` files using `csv-parse`.
 - **Security**: Secures endpoints with `helmet` and CORS policies.
@@ -17,81 +18,95 @@ A Node.js server for handling and processing `.tsv.gz` and `.csv.gz` files, buil
 
 ---
 
-## Installation
+## Quick Start
 
-1. Clone the repository:
+1. Clone and install:
    ```bash
    git clone https://github.com/your-username/zzs-data-server.git
    cd zzs-data-server
-   ```
-
-2. Install dependencies:
-   ```bash
    pnpm install
    ```
 
-3. Create an `.env` file in the root directory:
+2. Configure environment:
+   ```bash
+   cp .env.example .env
+   ```
+   Edit `.env` with your settings:
    ```env
    PORT=3000
-   API_KEYS=example-key-1,example-key-2
+   API_KEYS=your-secret-key-1,your-secret-key-2
    API_KEYS_REQUIRED=true
    NODE_ENV=development
    RATE_LIMIT_WINDOW_MS=60000
    RATE_LIMIT_MAX=100
+   LOG_LEVEL=info
+   REDIS_URL=redis://localhost:6379
+   REDIS_TTL=3600
    ```
 
-4. Build the project:
-   ```bash
-   pnpm build
-   ```
-
-5. Start the server:
-   ```bash
-   pnpm start
-   ```
-
----
-
-## Development
-
-For local development:
-
-1. Start the server in development mode:
+3. Start development:
    ```bash
    pnpm dev
    ```
 
-2. Format and lint the code using Biome:
-   - Check for issues:
-     ```bash
-     pnpm lint:check
-     ```
-   - Fix issues:
-     ```bash
-     pnpm lint:fix
-     ```
+---
 
-3. Set up Lefthook for Git hooks:
-   ```bash
-   pnpm lefthook install
-   ```
+## Development Guide
 
-4. Run pre-commit hooks manually:
-   ```bash
-   pnpm lefthook run pre-commit
-   ```
+### Prerequisites
+- Node.js 18+
+- pnpm 8+
+- Git
+
+### Code Quality Tools
+- **Biome**: `pnpm lint:check` and `pnpm lint:fix`
+- **Lefthook**: `pnpm lefthook install`
+- **Tests**: `pnpm test`
 
 ---
 
-## API Endpoints
+## API Reference
 
-### **Base URL:** `/api`
+### Authentication
+All endpoints require an API key header:
+```http
+X-API-Key: your-secret-key
+```
 
-#### **Versioned Endpoints**
-- **GET `/api/v1/data`**: Fetches data using version 1 features.
+### Endpoints
 
-#### **Catch-All Route**
-Returns a `404` response for undefined endpoints.
+#### GET /api/v1/data
+Fetches processed data from the server.
+
+**Query Parameters:**
+- `format` (optional): Response format ('json' | 'csv')
+- `filter` (optional): Filter criteria
+
+**Response:**
+```json
+{
+  "data": [...],
+  "meta": {
+    "count": 100,
+    "timestamp": "2024-01-20T12:00:00Z"
+  }
+}
+```
+
+---
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| PORT | Server port | 3000 |
+| API_KEYS | Comma-separated API keys | (required) |
+| NODE_ENV | Environment mode | development |
+| LOG_LEVEL | Logging level | info |
+| REDIS_URL | Redis connection URL | redis://localhost:6379 |
+| REDIS_TTL | Cache TTL in seconds | 3600 |
 
 ---
 
@@ -190,10 +205,63 @@ Naming convention: `*.jest-test.*` for Jest tests and `*.node-test.*` for Node.j
 
 ---
 
+## Docker Support
+
+```dockerfile
+# Example docker-compose.yml
+version: '3.8'
+services:
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    volumes:
+      - ./database:/app/database
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:
+```
+
+---
+
 ## Logging
 
 - Uses `pino` and `pino-http` for structured logging.
 - Development mode uses `pino-pretty` for readable logs.
+
+---
+
+## Caching
+
+The server uses Redis for caching responses:
+
+- **Default TTL**: 1 hour (configurable via `REDIS_TTL`)
+- **Cache Keys**: Based on request path and query parameters
+- **Manual Invalidation**: Available through admin endpoints
+- **Health Check**: Redis connection status monitored
+
+### Cache Management
+
+1. Clear specific cache:
+   ```bash
+   curl -X DELETE "/api/v1/cache/:key" -H "X-API-Key: your-secret-key"
+   ```
+
+2. Clear all cache:
+   ```bash
+   curl -X DELETE "/api/v1/cache" -H "X-API-Key: your-secret-key"
+   ```
 
 ---
 
