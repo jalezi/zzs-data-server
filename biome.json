@@ -49,6 +49,15 @@
           "fix": "none",
           "level": "error"
         }
+      },
+      "suspicious": {
+        "noConsole": {
+          "fix": "none",
+          "level": "error",
+          "options": {
+            "allow": ["assert", "warn", "error"]
+          }
+        }
       }
     }
   },

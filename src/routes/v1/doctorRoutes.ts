@@ -250,8 +250,6 @@ router.get(
       const fuse = initializeFuse(normalizedData);
       const results = fuse.search(normalizedQuery);
 
-      console.log(results);
-
       if (results.length === 0) {
         res.status(404).json({ error: `No results found for query '${q}'` });
         return;
